@@ -1,0 +1,4 @@
+--2025-01-03 01:59:26--  https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
+Resolving developer.download.nvidia.com (developer.download.nvidia.com)... 121.254.136.179, 121.254.136.90
+Connecting to developer.download.nvidia.com (developer.download.nvidia.com)|121.254.136.179|:443... failed: Connection timed out.
+Connecting to developer.download.nvidia.com (developer.download.nvidia.com)|121.254.136.90|:443... 
