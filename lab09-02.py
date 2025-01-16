@@ -13,16 +13,16 @@ y_data = np.array([[0], [1], [1], [0]], dtype=np.float32)
 X = Variable(torch.from_numpy(x_data))
 Y = Variable(torch.from_numpy(y_data))
 
-# device = (
-#     "cuda"
-#     if torch.cuda.is_available()
-#     else "mps"
-#     if torch.backends.mps.is_available()
-#     else "cpu"
-# )
-# print(f"Using {device} device")
+device = (
+    "cuda"
+    if torch.cuda.is_available()
+    else "mps"
+    if torch.backends.mps.is_available()
+    else "cpu"
+)
+print(f"Using {device} device")
 
-device = "cpu"
+# device = "cpu"
 
 # 신경망 클래스 생성
 class NeuralNetwork(nn.Module) :
@@ -30,6 +30,7 @@ class NeuralNetwork(nn.Module) :
         super().__init__()
         self.flatten = nn.Flatten()
         self.layer_stack = nn.Sequential(
+            ## Single Layer만 사용하면 정확도 0.5에 수렴함
             nn.Linear(2, 4),
             nn.Sigmoid(),
             nn.Linear(4, 1),
@@ -60,11 +61,12 @@ for step in range(10001):
     optimizer.step()
 
     if step % 500 == 0:
-        print(step, cost.data.numpy())
+        # print(step, cost.data.numpy())
+        print(step, cost.item())
 
 # Accuracy computation
 # True if hypothesis>0.5 else False
 predicted = (model(X).data > 0.5).float()
 accuracy = (predicted == Y.data).float().mean()
-print("\nHypothesis: \n", hypothesis.data.numpy(), "\nCorrect: \n",
-      predicted.numpy(), "\nAccuracy: ", accuracy)
+print("\nHypothesis: \n", hypothesis.detach().cpu().numpy(), "\nCorrect: \n",
+      predicted.detach().cpu().numpy(), "\nAccuracy: ", accuracy)
