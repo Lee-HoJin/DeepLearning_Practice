@@ -46,7 +46,8 @@ class NeuralNetwork(nn.Module) :
 # 모델 정의 및 훈련
 model = NeuralNetwork().to(device)
 criterion = nn.BCELoss
-optimizer = torch.optim.Adam(model.parameters(), lr = 0.1)
+optimizer = torch.optim.SGD(model.parameters(), lr = 0.1)
+# optimizer = torch.optim.Adam(model.parameters(), lr = 0.1)
 
 for step in range(10001):
     X, Y = X.to(device), Y.to(device)
