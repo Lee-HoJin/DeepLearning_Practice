@@ -1,4 +1,4 @@
-# Lab 11 MNIST and Convolutional Neural Network
+# Lab 11 MNIST and Deep learning CNN
 import torch
 torch.cuda.init()
 from torch.autograd import Variable
@@ -12,6 +12,7 @@ torch.manual_seed(777)  # reproducibility
 learning_rate = 0.0001
 training_epochs = 15
 batch_size = 64
+keep_prob = 0.7
 
 # MNIST dataset
 mnist_train = dsets.MNIST(root='MNIST_data/',
@@ -29,7 +30,7 @@ data_loader = torch.utils.data.DataLoader(dataset=mnist_train,
                                           batch_size=batch_size,
                                           shuffle=True)
 
-# CNN Model (2 conv layers)
+# CNN Model
 
 
 class CNN(torch.nn.Module):
@@ -42,23 +43,43 @@ class CNN(torch.nn.Module):
         self.layer1 = torch.nn.Sequential(
             torch.nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),
             torch.nn.ReLU(),
-            torch.nn.MaxPool2d(kernel_size=2, stride=2))
+            torch.nn.MaxPool2d(kernel_size=2, stride=2),
+            torch.nn.Dropout(p=1 - keep_prob))
         # L2 ImgIn shape=(?, 14, 14, 32)
         #    Conv      ->(?, 14, 14, 64)
         #    Pool      ->(?, 7, 7, 64)
         self.layer2 = torch.nn.Sequential(
             torch.nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
             torch.nn.ReLU(),
-            torch.nn.MaxPool2d(kernel_size=2, stride=2))
-        # Final FC 7x7x64 inputs -> 10 outputs
-        self.fc = torch.nn.Linear(7 * 7 * 64, 10, bias=True)
-        torch.nn.init.xavier_uniform_(self.fc.weight)
+            torch.nn.MaxPool2d(kernel_size=2, stride=2),
+            torch.nn.Dropout(p=1 - keep_prob))
+        # L3 ImgIn shape=(?, 7, 7, 64)
+        #    Conv      ->(?, 7, 7, 128)
+        #    Pool      ->(?, 4, 4, 128)
+        self.layer3 = torch.nn.Sequential(
+            torch.nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.MaxPool2d(kernel_size=2, stride=2, padding=1),
+            torch.nn.Dropout(p=1 - keep_prob))
+
+        # L4 FC 4x4x128 inputs -> 625 outputs
+        self.fc1 = torch.nn.Linear(4 * 4 * 128, 625, bias=True)
+        torch.nn.init.xavier_uniform_(self.fc1.weight)
+        self.layer4 = torch.nn.Sequential(
+            self.fc1,
+            torch.nn.ReLU(),
+            torch.nn.Dropout(p=1 - keep_prob))
+        # L5 Final FC 625 inputs -> 10 outputs
+        self.fc2 = torch.nn.Linear(625, 10, bias=True)
+        torch.nn.init.xavier_uniform_(self.fc2.weight)
 
     def forward(self, x):
         out = self.layer1(x)
         out = self.layer2(out)
+        out = self.layer3(out)
         out = out.view(out.size(0), -1)   # Flatten them for FC
-        out = self.fc(out)
+        out = self.fc1(out)
+        out = self.fc2(out)
         return out
 
 device = (
