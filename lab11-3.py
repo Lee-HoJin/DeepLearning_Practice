@@ -10,8 +10,8 @@ torch.manual_seed(777)  # reproducibility
 
 # parameters
 learning_rate = 0.0001
-training_epochs = 15
-batch_size = 64
+training_epochs = 50
+batch_size = 128
 
 # MNIST dataset
 mnist_train = dsets.MNIST(root='MNIST_data/',
@@ -149,12 +149,12 @@ def ensemble_predict (models, X) :
     predictions = [model.predict(X).detach() for model in models]
 
     ## 결과 값의 평균 사용
-    # avg_prediction = torch.mean(torch.stack(predictions), dim = 0)
-    # return avg_prediction
+    avg_prediction = torch.mean(torch.stack(predictions), dim = 0)
+    return avg_prediction
 
     ## 결과 값의 합 사용
-    summed_prediction = torch.sum(torch.stack(predictions), dim = 0)
-    return summed_prediction
+    # summed_prediction = torch.sum(torch.stack(predictions), dim = 0)
+    # return summed_prediction
 
 X_test = mnist_test.data.view(len(mnist_test), 1, 28, 28).float()
 Y_test = mnist_test.targets

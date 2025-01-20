@@ -10,8 +10,8 @@ torch.manual_seed(777)  # reproducibility
 
 # parameters
 learning_rate = 0.0001
-training_epochs = 15
-batch_size = 64
+training_epochs = 50
+batch_size = 128
 
 # MNIST dataset
 mnist_train = dsets.MNIST(root='MNIST_data/',
@@ -99,7 +99,7 @@ for epoch in range(training_epochs):
 
         avg_cost += cost.data / total_batch
 
-    print("[Epoch: {:>4}] cost = {:>.9}".format(epoch + 1, avg_cost.item()))
+    # print("[Epoch: {:>4}] cost = {:>.9}".format(epoch + 1, avg_cost.item()))
 
 print('Learning Finished!')
 
