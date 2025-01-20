@@ -30,8 +30,6 @@ data_loader = torch.utils.data.DataLoader(dataset=mnist_train,
                                           shuffle=True)
 
 # CNN Model (2 conv layers)
-
-
 class CNN(torch.nn.Module):
 
     def __init__(self):
@@ -116,4 +114,10 @@ X_test, Y_test = X_test.to(device), Y_test.to(device)
 prediction = model(X_test)
 correct_prediction = (torch.max(prediction.data, 1)[1] == Y_test.data)
 accuracy = correct_prediction.float().mean()
+
+print("Model 1")
 print('Accuracy:', accuracy)
+print("HyperParams")
+print("Learning Rate: ", learning_rate)
+print("Batch Size: ", batch_size)
+print("Training Epochs: ", training_epochs)

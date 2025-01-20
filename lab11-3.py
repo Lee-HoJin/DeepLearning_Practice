@@ -44,7 +44,7 @@ class CNN(torch.nn.Module):
             torch.nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),
             torch.nn.ReLU(),
             torch.nn.MaxPool2d(kernel_size=2, stride=2),
-            torch.nn.Dropout(0.5))
+            torch.nn.Dropout(0.2))
         # L2 ImgIn shape=(?, 14, 14, 32)
         #    Conv      ->(?, 14, 14, 64)
         #    Pool      ->(?, 7, 7, 64)
@@ -52,7 +52,7 @@ class CNN(torch.nn.Module):
             torch.nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
             torch.nn.ReLU(),
             torch.nn.MaxPool2d(kernel_size=2, stride=2),
-            torch.nn.Dropout(0.5))
+            torch.nn.Dropout(0.2))
         # L3 ImgIn shape=(?, 7, 7, 64)
         #    Conv      ->(?, 7, 7, 128)
         #    Pool      ->(?, 4, 4, 128)
@@ -60,7 +60,7 @@ class CNN(torch.nn.Module):
             torch.nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
             torch.nn.ReLU(),
             torch.nn.MaxPool2d(kernel_size=2, stride=2, padding=1),
-            torch.nn.Dropout(0.5))
+            torch.nn.Dropout(0.2))
         # L4 FC 4x4x128 inputs -> 625 outputs
         self.fc1 = torch.nn.Linear(4 * 4 * 128, 625, bias=True)
         torch.nn.init.xavier_uniform_(self.fc1.weight)

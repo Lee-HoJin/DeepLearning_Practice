@@ -12,7 +12,6 @@ torch.manual_seed(777)  # reproducibility
 learning_rate = 0.0001
 training_epochs = 15
 batch_size = 64
-keep_prob = 0.7
 
 # MNIST dataset
 mnist_train = dsets.MNIST(root='MNIST_data/',
@@ -44,7 +43,7 @@ class CNN(torch.nn.Module):
             torch.nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),
             torch.nn.ReLU(),
             torch.nn.MaxPool2d(kernel_size=2, stride=2),
-            torch.nn.Dropout(p=1 - keep_prob))
+            torch.nn.Dropout(0.2))
         # L2 ImgIn shape=(?, 14, 14, 32)
         #    Conv      ->(?, 14, 14, 64)
         #    Pool      ->(?, 7, 7, 64)
@@ -52,7 +51,7 @@ class CNN(torch.nn.Module):
             torch.nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
             torch.nn.ReLU(),
             torch.nn.MaxPool2d(kernel_size=2, stride=2),
-            torch.nn.Dropout(p=1 - keep_prob))
+            torch.nn.Dropout(0.2))
         # L3 ImgIn shape=(?, 7, 7, 64)
         #    Conv      ->(?, 7, 7, 128)
         #    Pool      ->(?, 4, 4, 128)
@@ -60,7 +59,7 @@ class CNN(torch.nn.Module):
             torch.nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
             torch.nn.ReLU(),
             torch.nn.MaxPool2d(kernel_size=2, stride=2, padding=1),
-            torch.nn.Dropout(p=1 - keep_prob))
+            torch.nn.Dropout(0.2))
 
         # L4 FC 4x4x128 inputs -> 625 outputs
         self.fc1 = torch.nn.Linear(4 * 4 * 128, 625, bias=True)
@@ -68,7 +67,7 @@ class CNN(torch.nn.Module):
         self.layer4 = torch.nn.Sequential(
             self.fc1,
             torch.nn.ReLU(),
-            torch.nn.Dropout(p=1 - keep_prob))
+            torch.nn.Dropout(0.5))
         # L5 Final FC 625 inputs -> 10 outputs
         self.fc2 = torch.nn.Linear(625, 10, bias=True)
         torch.nn.init.xavier_uniform_(self.fc2.weight)
@@ -137,4 +136,10 @@ X_test, Y_test = X_test.to(device), Y_test.to(device)
 prediction = model(X_test)
 correct_prediction = (torch.max(prediction.data, 1)[1] == Y_test.data)
 accuracy = correct_prediction.float().mean()
+
+print("Model 2")
 print('Accuracy:', accuracy)
+print("HyperParams")
+print("Learning Rate: ", learning_rate)
+print("Batch Size: ", batch_size)
+print("Training Epochs: ", training_epochs)
