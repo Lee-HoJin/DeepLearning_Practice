@@ -9,9 +9,9 @@ import torch.nn.init
 torch.manual_seed(777)  # reproducibility
 
 # parameters
-learning_rate = 0.001
+learning_rate = 0.0001
 training_epochs = 15
-batch_size = 100
+batch_size = 64
 
 # MNIST dataset
 mnist_train = dsets.MNIST(root='MNIST_data/',
@@ -30,8 +30,6 @@ data_loader = torch.utils.data.DataLoader(dataset=mnist_train,
                                           shuffle=True)
 
 # CNN Model
-
-
 class CNN(torch.nn.Module):
 
     def __init__(self):
@@ -39,8 +37,6 @@ class CNN(torch.nn.Module):
         self._build_net()
 
     def _build_net(self):
-        # dropout (keep_prob) rate  0.7~0.5 on training, but should be 1
-        self.keep_prob = 0.7
         # L1 ImgIn shape=(?, 28, 28, 1)
         #    Conv     -> (?, 28, 28, 32)
         #    Pool     -> (?, 14, 14, 32)
@@ -48,7 +44,7 @@ class CNN(torch.nn.Module):
             torch.nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),
             torch.nn.ReLU(),
             torch.nn.MaxPool2d(kernel_size=2, stride=2),
-            torch.nn.Dropout(p=1 - self.keep_prob))
+            torch.nn.Dropout(0.5))
         # L2 ImgIn shape=(?, 14, 14, 32)
         #    Conv      ->(?, 14, 14, 64)
         #    Pool      ->(?, 7, 7, 64)
@@ -56,7 +52,7 @@ class CNN(torch.nn.Module):
             torch.nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
             torch.nn.ReLU(),
             torch.nn.MaxPool2d(kernel_size=2, stride=2),
-            torch.nn.Dropout(p=1 - self.keep_prob))
+            torch.nn.Dropout(0.5))
         # L3 ImgIn shape=(?, 7, 7, 64)
         #    Conv      ->(?, 7, 7, 128)
         #    Pool      ->(?, 4, 4, 128)
@@ -64,15 +60,14 @@ class CNN(torch.nn.Module):
             torch.nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
             torch.nn.ReLU(),
             torch.nn.MaxPool2d(kernel_size=2, stride=2, padding=1),
-            torch.nn.Dropout(p=1 - self.keep_prob))
+            torch.nn.Dropout(0.5))
         # L4 FC 4x4x128 inputs -> 625 outputs
-        self.keep_prob = 0.5
         self.fc1 = torch.nn.Linear(4 * 4 * 128, 625, bias=True)
         torch.nn.init.xavier_uniform_(self.fc1.weight)
         self.layer4 = torch.nn.Sequential(
             self.fc1,
             torch.nn.ReLU(),
-            torch.nn.Dropout(p=1 - self.keep_prob))
+            torch.nn.Dropout(0.5))
         # L5 Final FC 625 inputs -> 10 outputs
         self.fc2 = torch.nn.Linear(625, 10, bias=True)
         torch.nn.init.xavier_uniform_(self.fc2.weight)
@@ -123,33 +118,55 @@ device = (
 print(f"\nUsing {device} device")
 print("GPU: ", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "None")
 
-# instantiate CNN model
-model = CNN().to(device)
+
+num_models = 5
+ensemble_models = [CNN().to(device) for _ in range(num_models)]
 
 # train my model
 print('Learning started. It takes sometime.')
-for epoch in range(training_epochs):
-    avg_cost = 0
-    total_batch = len(mnist_train) // batch_size
+model_count = 0
+for model in ensemble_models :
+    model_count += 1
+    print(f"Model {model_count}/{num_models} is now learning")
+    for epoch in range(training_epochs):
+        avg_cost = 0
+        total_batch = len(mnist_train) // batch_size
 
-    for i, (batch_xs, batch_ys) in enumerate(data_loader):
-        # image is already size of (28x28), no reshape
-        X = Variable(batch_xs)
-        Y = Variable(batch_ys)    # label is not one-hot encoded
+        for i, (batch_xs, batch_ys) in enumerate(data_loader):
+            # image is already size of (28x28), no reshape
+            X, Y = batch_xs.to(device), batch_ys.to(device)
 
-        X, Y = X.to(device), Y.to(device)
+            cost = model.train_model(X, Y)
 
-        cost = model.train_model(X, Y)
+            avg_cost += cost.data / total_batch
 
-        avg_cost += cost.data / total_batch
-
-    print("[Epoch: {:>4}] cost = {:>.9}".format(epoch + 1, avg_cost.item()))
+        # print("[Epoch: {:>4}] cost = {:>.9}".format(epoch + 1, avg_cost.item()))
 
 print('Learning Finished!')
+
+# Ensemble Evaluation
+def ensemble_predict (models, X) :
+    predictions = [model.predict(X).detach() for model in models]
+
+    ## 결과 값의 평균 사용
+    # avg_prediction = torch.mean(torch.stack(predictions), dim = 0)
+    # return avg_prediction
+
+    ## 결과 값의 합 사용
+    summed_prediction = torch.sum(torch.stack(predictions), dim = 0)
+    return summed_prediction
 
 X_test = mnist_test.data.view(len(mnist_test), 1, 28, 28).float()
 Y_test = mnist_test.targets
 
 X_test, Y_test = X_test.to(device), Y_test.to(device)
 
-print('Accuracy:', model.get_accuracy(X_test, Y_test))
+ensemble_output = ensemble_predict(ensemble_models, X_test)
+ensemble_accuracy = (torch.max(ensemble_output, 1)[1] == Y_test).float().mean()
+
+print("Model 3")
+print("Ensemble Accuracy:", ensemble_accuracy.item())
+print("HyperParams")
+print("Learning Rate: ", learning_rate)
+print("Batch Size: ", batch_size)
+print("Training Epochs: ", training_epochs)
