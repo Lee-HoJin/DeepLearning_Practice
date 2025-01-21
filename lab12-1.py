@@ -1,5 +1,6 @@
 # Lab 12 RNN
 import torch
+torch.cuda.init()
 import torch.nn as nn
 from torch.autograd import Variable
 
@@ -36,7 +37,6 @@ batch_size = 1   # one sentence
 sequence_length = 6  # |ihello| == 6
 num_layers = 1  # one-layer rnn
 
-
 class RNN(nn.Module):
 
     def __init__(self, num_classes, input_size, hidden_size, num_layers):
@@ -59,10 +59,10 @@ class RNN(nn.Module):
     def forward(self, x):
         # Initialize hidden and cell states
         h_0 = Variable(torch.zeros(
-            x.size(0), self.num_layers, self.hidden_size))
+            x.size(0), self.num_layers, self.hidden_size)).to(device)
 
         # Reshape input
-        x.view(x.size(0), self.sequence_length, self.input_size)
+        x.view(x.size(0), self.sequence_length, self.input_size).to(device)
 
         # Propagate input through RNN
         # Input: (batch, seq_len, input_size)
@@ -78,8 +78,21 @@ class RNN(nn.Module):
         return out
 
 
+# Device Selection
+device = (
+    "cuda"
+    if torch.cuda.is_available()
+    else "mps"
+    
+    if torch.backends.mps.is_available()
+    else "cpu"
+)
+# device = 'cpu'
+print(f"\nUsing {device} device")
+print("GPU: ", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "None")
+
 # Instantiate RNN model
-rnn = RNN(num_classes, input_size, hidden_size, num_layers)
+rnn = RNN(num_classes, input_size, hidden_size, num_layers).to(device)
 
 # Set loss and optimizer function
 criterion = torch.nn.CrossEntropyLoss()    # Softmax is internally computed.
@@ -87,15 +100,19 @@ optimizer = torch.optim.Adam(rnn.parameters(), lr=learning_rate)
 
 # Train the model
 for epoch in range(num_epochs):
+    inputs, labels = inputs.to(device), labels.to(device)
+
     outputs = rnn(inputs)
     optimizer.zero_grad()
     loss = criterion(outputs, labels)
     loss.backward()
     optimizer.step()
+
     _, idx = outputs.max(1)
-    idx = idx.data.numpy()
+    idx = idx.detach().cpu().numpy()
     result_str = [idx2char[c] for c in idx.squeeze()]
-    print("epoch: %d, loss: %1.3f" % (epoch + 1, loss.data.item()))
+
+    print("epoch: %d, loss: %1.3f" % (epoch + 1, loss.item()))
     print("Predicted string: ", ''.join(result_str))
 
 print("Learning finished!")

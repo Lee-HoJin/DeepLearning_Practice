@@ -8,6 +8,8 @@ import torch
 torch.cuda.init()
 import torch.nn as nn
 from torch.autograd import Variable
+from torch.utils.data import DataLoader, Dataset, random_split
+from torchvision import datasets, transforms
 import numpy as np
 import os
 import matplotlib
@@ -84,13 +86,45 @@ device = (
 print(f"\nUsing {device} device")
 print("GPU: ", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "None")
 
+class EarlyStopping :
+    def __init__(self, patience = 5, delta = 0) :
+        self.patience = patience # 개선되지 않은 epoch 수
+        self.delta = delta # 개선 기준 (손실 감소량)
+        self.best_loss = None
+        self.counter = 0 # 개선되지 않은 epoch 수
+        self.early_stop = False
+
+    def __call__(self, val_loss, model) :
+        if self.best_loss is None :
+            self.best_loss = val_loss
+        elif val_loss < self.best_loss - self.delta :
+            self.best_loss = val_loss
+            self.counter = 0 # 성능이 개선되었으므로 카운터 리셋
+        else :
+            self.counter += 1
+
+        if self.counter >= self.patience :
+            self.early_stop = True
+            # print(f"Early stopping triggered after {self.patience} epochs without improvement.")
+
+        return self.early_stop
+
+
 # train/test split
-train_size = int(len(dataY) * 0.8)
-test_size = len(dataY) - train_size
+train_size = int(len(dataX) * 0.8)
+val_size = int(0.1 * len(dataX))
+test_size = len(dataX) - train_size - val_size
+
+# # 데이터셋을 훈련, 검증, 테스트로 분리
+# train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
+
 trainX = torch.Tensor(np.array(dataX[0:train_size])).to(device)
-testX = torch.Tensor(np.array(dataX[train_size:len(dataX)])).to(device)
+valX = torch.Tensor(np.array(dataX[train_size  : train_size + val_size])).to(device)
+testX = torch.Tensor(np.array(dataX[train_size + val_size : len(dataX)])).to(device)
+
 trainY = torch.Tensor(np.array(dataY[0:train_size])).to(device)
-testY = torch.Tensor(np.array(dataY[train_size:len(dataY)])).to(device)
+valY = torch.Tensor(np.array(dataY[train_size  : train_size + val_size])).to(device)
+testY = torch.Tensor(np.array(dataY[train_size + val_size : len(dataY)])).to(device)
 
 
 class ManyToManyLSTM(nn.Module) :
@@ -131,6 +165,8 @@ optimizer = torch.optim.Adam(model.parameters(),
                              weight_decay = 1e-4
                              )
 
+early_stopping = EarlyStopping(patience = 40, delta = 0.05)
+
 # Train the model
 for epoch in range(num_epochs):
     model.train()
@@ -141,6 +177,23 @@ for epoch in range(num_epochs):
     loss.backward()
     optimizer.step()
     # print("Epoch: %d, loss: %1.5f" % (epoch, loss.data.item()))
+
+    # 검증 정확도 계산(Early Stopping)
+    model.eval()
+    val_loss = 0.0
+
+    with torch.no_grad() :
+        outputs = model(valX)
+        loss = criterion(outputs, valY)
+        val_loss += loss.item()
+
+    if epoch % 20 == 0:
+        print(f"Validation Loss: {val_loss:.4f},")
+
+    # EarlyStopping 체크
+    if early_stopping(val_loss, model):
+        print(f"Stopping early at epoch {epoch+1}")
+        break
 
 print("Learning finished!")
 

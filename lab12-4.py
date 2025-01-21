@@ -46,10 +46,10 @@ def MinMaxScaler(data):
 
 
 # train Parameters
-learning_rate = 0.001
-num_epochs = 3000
+learning_rate = 0.0005
+num_epochs = 3001
 input_size = 5
-hidden_size = 256
+hidden_size = 512
 num_classes = 1
 timesteps = seq_length = 7
 num_layers = 1  # number of layers in RNN
@@ -85,12 +85,17 @@ print(f"\nUsing {device} device")
 print("GPU: ", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "None")
 
 # train/test split
-train_size = int(len(dataY) * 0.7)
-test_size = len(dataY) - train_size
+train_size = int(len(dataX) * 0.8)
+test_size = len(dataX) - train_size
+
+# # 데이터셋을 훈련, 검증, 테스트로 분리
+# train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
+
 trainX = torch.Tensor(np.array(dataX[0:train_size])).to(device)
-testX = torch.Tensor(np.array(dataX[train_size:len(dataX)])).to(device)
+testX = torch.Tensor(np.array(dataX[train_size : len(dataX)])).to(device)
+
 trainY = torch.Tensor(np.array(dataY[0:train_size])).to(device)
-testY = torch.Tensor(np.array(dataY[train_size:len(dataY)])).to(device)
+testY = torch.Tensor(np.array(dataY[train_size : len(dataY)])).to(device)
 
 
 class LSTM(nn.Module):
@@ -127,9 +132,17 @@ class LSTM(nn.Module):
         out = self.fc(h_out)  # => shape: [batch_size, num_classes]
         return out
 
+def init_weights(m) :
+    if isinstance(m, nn.Linear) :
+        # He 초기화
+        nn.init.kaiming_normal_(m.weight, nonlinearity = 'relu')
+        if m.bias is not None:
+            nn.init.zeros_(m.bias)
 
 # Instantiate RNN model
-lstm = LSTM(num_classes, input_size, hidden_size, num_layers).to(device)
+lstm = LSTM(num_classes, input_size, hidden_size, num_layers)
+lstm.apply(init_weights)
+lstm = lstm.to(device)
 
 # Set loss and optimizer function
 criterion = torch.nn.MSELoss()    # mean-squared error for regression
@@ -138,15 +151,21 @@ optimizer = torch.optim.Adam(lstm.parameters(),
                              weight_decay = 1e-4
                              )
 
+# early_stopping = EarlyStopping(patience = 200, delta = 0.0001)
+
 # Train the model
 for epoch in range(num_epochs):
+    lstm.train()
     outputs = lstm(trainX)
     optimizer.zero_grad()
+
     # obtain the loss function
     loss = criterion(outputs, trainY)
     loss.backward()
     optimizer.step()
-    # print("Epoch: %d, loss: %1.5f" % (epoch, loss.data.item()))
+
+    if epoch % 200 == 0 :
+        print("Epoch: %d, loss: %1.5f" % (epoch, loss.data.item()))
 
 print("Learning finished!")
 
