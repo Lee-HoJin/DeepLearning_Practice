@@ -10,7 +10,7 @@ torch.manual_seed(777)  # reproducibility
 
 # parameters
 learning_rate = 0.0001
-training_epochs = 50
+training_epochs = 80
 batch_size = 128
 
 # MNIST dataset
