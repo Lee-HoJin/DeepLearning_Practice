@@ -17,25 +17,6 @@ if "DISPLAY" not in os.environ:
 
 
 def MinMaxScaler(data):
-    ''' Min Max Normalization
-
-    Parameters
-    ----------
-    data : numpy.ndarray
-        input data to be normalized
-        shape: [Batch size, dimension]
-
-    Returns
-    ----------
-    data : numpy.ndarry
-        normalized data
-        shape: [Batch size, dimension]
-
-    References
-    ----------
-    .. [1] http://sebastianraschka.com/Articles/2014_about_feature_scaling.html
-
-    '''
     numerator = data - np.min(data, 0)
     denominator = np.max(data, 0) - np.min(data, 0)
     # noise term prevents the zero division
@@ -43,12 +24,12 @@ def MinMaxScaler(data):
 
 
 # train Parameters
-learning_rate = 0.001
+learning_rate = 0.0005
 num_epochs = 5001
 input_size = 8
 hidden_size = 512
 num_classes = 1
-timesteps = seq_length = 14
+timesteps = seq_length = 10
 num_layers = 1  # number of layers in RNN
 
 df = pd.read_csv('에코프로비엠.csv', encoding='utf-8-sig')
