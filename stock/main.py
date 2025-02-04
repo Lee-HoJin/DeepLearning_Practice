@@ -52,9 +52,16 @@ timesteps = seq_length = 7
 num_layers = 1  # number of layers in RNN
 
 df = pd.read_csv('에코프로비엠.csv', encoding='utf-8-sig')
-xy = df.iloc[1:].to_numpy()
+df = df.apply(pd.to_numeric, errors='coerce')
+df = df.drop(columns=['날짜'])
+df = df.dropna()
+xy = df.to_numpy()
 
-# xy = xy[::-1]  # reverse order (chronically ordered)
+# 대상 열(예: 마지막 열, 주가)의 최소/최대 값 저장
+## for inverse scaling
+target_min = np.min(xy[:, -1])
+target_max = np.max(xy[:, -1])
+
 xy = MinMaxScaler(xy)
 x = xy
 y = xy[:, [-1]]  # Close as label
@@ -62,7 +69,7 @@ y = xy[:, [-1]]  # Close as label
 # build a dataset
 dataX = []
 dataY = []
-for i in range(1, len(y) - seq_length):
+for i in range(0, len(y) - seq_length):
     _x = x[i:i + seq_length]
     _y = y[i + seq_length]
     # print(_x, "->", _y)
@@ -85,9 +92,6 @@ print("GPU: ", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "
 # train/test split
 train_size = int(len(dataX) * 0.8)
 test_size = len(dataX) - train_size
-
-# # 데이터셋을 훈련, 검증, 테스트로 분리
-# train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
 
 trainX = torch.Tensor(np.array(dataX[0:train_size])).to(device)
 testX = torch.Tensor(np.array(dataX[train_size : len(dataX)])).to(device)
@@ -163,7 +167,7 @@ for epoch in range(num_epochs):
     optimizer.step()
 
     if epoch % 200 == 0 :
-        print("Epoch: %d, loss: %1.5f" % (epoch, loss.data.item()))
+        print("Epoch: %d, loss: %1.8f" % (epoch, loss.data.item()))
 
 print("Learning finished!")
 
@@ -183,3 +187,16 @@ plt.ylabel("Stock Price")
 plt.legend()
 # plt.show()
 plt.savefig("./stock_prediction_torch.png")
+
+# 최신 time window 추출 (xy는 이미 정규화된 NumPy 배열)
+last_window = xy[-seq_length:]         # shape: (seq_length, input_size)
+last_window_tensor = torch.Tensor(last_window).unsqueeze(0).to(device)  # 배치 차원 추가
+
+# 모델 평가 모드로 전환
+lstm.eval()
+with torch.no_grad():
+    next_day_pred = lstm(last_window_tensor)
+
+# inverse scaling
+next_day_pred_original = next_day_pred * (target_max - target_min) + target_min
+print("Next day predicted price (original scale):", next_day_pred_original)
