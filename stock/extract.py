@@ -4,13 +4,13 @@ import pandas as pd
 import ta.momentum
 
 
-df = stock.get_market_ohlcv_by_date("20200101", "20250101", "247540")
+df = stock.get_market_ohlcv_by_date("20200101", "20250203", "247540")
 print(df.head())
 
 df['RSI'] = ta.momentum.rsi(df['종가'], window = 14)
 print(df[['종가', 'RSI']].tail())
 
-df_trading = stock.get_market_trading_value_by_date("20200101", "20250101", "247540")
+df_trading = stock.get_market_trading_value_by_date("20200101", "20250203", "247540")
 print(df_trading)
 
 df_close = df['종가']

@@ -25,12 +25,12 @@ def MinMaxScaler(data):
 
 # train Parameters
 learning_rate = 0.0005
-num_epochs = 5001
+num_epochs = 5000
 input_size = 8
-hidden_size = 512
+hidden_size = 128
 num_classes = 1
 timesteps = seq_length = 10
-num_layers = 1  # number of layers in RNN
+num_layers = 2  # number of layers in RNN
 
 df = pd.read_csv('에코프로비엠.csv', encoding='utf-8-sig')
 df = df.drop(columns=['날짜', '등락률', '기타법인', '개인'])
@@ -132,7 +132,7 @@ lstm = lstm.to(device)
 criterion = torch.nn.MSELoss()    # mean-squared error for regression
 optimizer = torch.optim.Adam(lstm.parameters(),
                              lr=learning_rate,
-                             weight_decay = 1e-4
+                             weight_decay = 1e-5
                              )
 
 # early_stopping = EarlyStopping(patience = 200, delta = 0.0001)
