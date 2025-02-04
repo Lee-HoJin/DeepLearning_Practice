@@ -18,14 +18,14 @@ if "DISPLAY" not in os.environ:
 
 # train Parameters
 learning_rate = 0.0005
-num_epochs = 5000
+num_epochs = 3000
 input_size = 8
-hidden_size = 128
+hidden_size = 256
 num_classes = 1
 timesteps = seq_length = 10
-num_layers = 2  # number of layers in RNN
+num_layers = 4  # number of layers in RNN
 
-df = pd.read_csv('에코프로비엠_증자후.csv', encoding='utf-8-sig')
+df = pd.read_csv('에코프로비엠.csv', encoding='utf-8-sig')
 df = df.drop(columns=['날짜', '등락률', '기타법인', '개인'])
 df = df.apply(pd.to_numeric, errors='coerce')
 
@@ -135,8 +135,6 @@ optimizer = torch.optim.Adam(lstm.parameters(),
                              weight_decay = 1e-5
                              )
 
-# StepLR 스케줄러 정의: 매 100 에포크마다 lr을 gamma(예: 0.1) 배로 줄임
-scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=500, gamma=0.1)
 
 # early_stopping = EarlyStopping(patience = 200, delta = 0.0001)
 
@@ -151,8 +149,6 @@ for epoch in range(num_epochs):
     loss.backward()
     torch.nn.utils.clip_grad_norm_(lstm.parameters(), max_norm=1.0)
     optimizer.step()
-
-    scheduler.step()
 
     if epoch % 200 == 0 :
         print("Epoch: %d, loss: %1.8f" % (epoch, loss.data.item()))
