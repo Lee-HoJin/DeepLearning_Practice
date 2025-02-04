@@ -43,12 +43,12 @@ def MinMaxScaler(data):
 
 
 # train Parameters
-learning_rate = 0.0005
+learning_rate = 0.001
 num_epochs = 3001
 input_size = 11
 hidden_size = 512
 num_classes = 1
-timesteps = seq_length = 7
+timesteps = seq_length = 14
 num_layers = 1  # number of layers in RNN
 
 df = pd.read_csv('에코프로비엠.csv', encoding='utf-8-sig')
