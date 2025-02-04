@@ -5,6 +5,7 @@ import torch
 torch.cuda.init()
 import torch.nn as nn
 from torch.autograd import Variable
+import torch.optim as optim
 import numpy as np
 import pandas as pd
 import os
@@ -15,14 +16,6 @@ if "DISPLAY" not in os.environ:
     # remove Travis CI Error
     matplotlib.use('Agg')
 
-
-def MinMaxScaler(data):
-    numerator = data - np.min(data, 0)
-    denominator = np.max(data, 0) - np.min(data, 0)
-    # noise term prevents the zero division
-    return numerator / (denominator + 1e-7)
-
-
 # train Parameters
 learning_rate = 0.0005
 num_epochs = 5000
@@ -32,7 +25,7 @@ num_classes = 1
 timesteps = seq_length = 10
 num_layers = 2  # number of layers in RNN
 
-df = pd.read_csv('에코프로비엠.csv', encoding='utf-8-sig')
+df = pd.read_csv('에코프로비엠_증자후.csv', encoding='utf-8-sig')
 df = df.drop(columns=['날짜', '등락률', '기타법인', '개인'])
 df = df.apply(pd.to_numeric, errors='coerce')
 
@@ -43,6 +36,13 @@ xy = df.to_numpy()
 ## for inverse scaling
 target_min = np.min(xy[:, -1])
 target_max = np.max(xy[:, -1])
+
+
+def MinMaxScaler(data):
+    numerator = data - np.min(data, 0)
+    denominator = np.max(data, 0) - np.min(data, 0)
+    # noise term prevents the zero division
+    return numerator / (denominator + 1e-7)
 
 xy = MinMaxScaler(xy)
 x = xy
@@ -135,6 +135,9 @@ optimizer = torch.optim.Adam(lstm.parameters(),
                              weight_decay = 1e-5
                              )
 
+# StepLR 스케줄러 정의: 매 100 에포크마다 lr을 gamma(예: 0.1) 배로 줄임
+scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=500, gamma=0.1)
+
 # early_stopping = EarlyStopping(patience = 200, delta = 0.0001)
 
 # Train the model
@@ -146,7 +149,10 @@ for epoch in range(num_epochs):
     # obtain the loss function
     loss = criterion(outputs, trainY)
     loss.backward()
+    torch.nn.utils.clip_grad_norm_(lstm.parameters(), max_norm=1.0)
     optimizer.step()
+
+    scheduler.step()
 
     if epoch % 200 == 0 :
         print("Epoch: %d, loss: %1.8f" % (epoch, loss.data.item()))
