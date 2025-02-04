@@ -17,15 +17,16 @@ if "DISPLAY" not in os.environ:
     matplotlib.use('Agg')
 
 # train Parameters
-learning_rate = 0.0005
-num_epochs = 3000
+learning_rate = 0.0001
+num_epochs = 4000
 input_size = 8
-hidden_size = 256
+hidden_size = 512
 num_classes = 1
 timesteps = seq_length = 10
-num_layers = 4  # number of layers in RNN
+num_layers = 1  # number of layers in RNN
+
 decay_rate = 1e-5
-dropout_rate = 0.5
+early_stopping_patience = 500
 early_stopping_delta = 1e-5
 
 df = pd.read_csv('에코프로비엠.csv', encoding='utf-8-sig')
@@ -105,7 +106,7 @@ class EarlyStopping :
 
 class LSTM(nn.Module):
 
-    def __init__(self, num_classes, input_size, hidden_size, num_layers, dropout = 0.5):
+    def __init__(self, num_classes, input_size, hidden_size, num_layers):
         super(LSTM, self).__init__()
         self.num_classes = num_classes
         self.num_layers = num_layers
@@ -117,9 +118,8 @@ class LSTM(nn.Module):
         # When true, inputs are (batch_size, sequence_length, input_dimension)
         # instead of (sequence_length, batch_size, input_dimension)
         self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
-                            num_layers=num_layers, batch_first=True, dropout = dropout)
+                            num_layers=num_layers, batch_first=True)
         # Fully connected layer
-        self.dropout = nn.Dropout(dropout)
         self.fc = nn.Linear(hidden_size, num_classes)
 
     def forward(self, x):
@@ -134,7 +134,6 @@ class LSTM(nn.Module):
         # h_out의 shape: [num_layers, batch_size, hidden_size]
         # multi-layer 일 때는 마지막 레이어만 가져오기 => h_out[-1]
         h_out = h_out[-1]  # shape: [batch_size, hidden_size]
-
         out = self.fc(h_out)  # => shape: [batch_size, num_classes]
         return out
 
@@ -146,7 +145,7 @@ def init_weights(m) :
             nn.init.zeros_(m.bias)
 
 # Instantiate RNN model
-lstm = LSTM(num_classes, input_size, hidden_size, num_layers, dropout_rate)
+lstm = LSTM(num_classes, input_size, hidden_size, num_layers)
 lstm.apply(init_weights)
 lstm = lstm.to(device)
 
@@ -158,7 +157,8 @@ optimizer = torch.optim.Adam(lstm.parameters(),
                              )
 
 
-early_stopping = EarlyStopping(patience = 200, delta = early_stopping_delta)
+early_stopping = EarlyStopping(patience = early_stopping_patience,
+                               delta = early_stopping_delta)
 
 # Train the model
 for epoch in range(num_epochs):
@@ -181,8 +181,8 @@ for epoch in range(num_epochs):
 
     # EarlyStopping check
     early_stopping(val_loss.item())
-    if epoch % 199 == 0:
-        print(f"Epoch: {epoch + 1}, training loss: {loss.item():.8f}, validation loss: {val_loss.item():.8f}")
+    if epoch % 200 == 0:
+        print(f"Epoch: {epoch}, training loss: {loss.item():.8f}, validation loss: {val_loss.item():.8f}")
     if early_stopping.early_stop:
         print(f"Early stopping triggered at epoch {epoch}")
         break
