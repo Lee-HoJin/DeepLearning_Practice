@@ -51,7 +51,7 @@ num_classes = 1
 timesteps = seq_length = 7
 num_layers = 1  # number of layers in RNN
 
-df = pd.read_csv('에코프로비엠.csv', encoding='utf-8-sig')
+df = pd.read_csv('에코프로비엠.csv', encoding='utf-8-sig', header=None)
 xy = df.to_numpy()
 
 # xy = xy[::-1]  # reverse order (chronically ordered)
