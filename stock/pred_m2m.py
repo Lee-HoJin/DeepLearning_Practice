@@ -1,3 +1,7 @@
+from pykrx import stock
+import ta
+import ta.momentum
+
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -17,23 +21,48 @@ if "DISPLAY" not in os.environ:
     matplotlib.use('Agg')
 
 # Train Parameters
+num_layers = 4  # number of layers in RNN
 learning_rate = 0.0005
 num_epochs = 5000
 input_size = 8
-hidden_size = 64
+hidden_size = 8
 num_classes = 1
-timesteps = seq_length = 15
-num_layers = 1  # number of layers in RNN
+timesteps = seq_length = 60
+future_seq = 15  # 예측하고자 하는 미래 시퀀스 길이
 
-weight_decay = 1e-5
-early_stopping_patience = 200
-early_stopping_delta = 1e-5
+weight_decay = 1e-4
+early_stopping_patience = 500
+early_stopping_delta = 1e-4
 
-future_seq = 5  # 예측하고자 하는 미래 시퀀스 길이 (5일치)
+start_date = "20150101"
+end_date = "20250204"
+code = "247540"
+stock_name = '에코프로비엠'
 
-# Data Loading and Preprocessing
-df = pd.read_csv('에코프로.csv', encoding='utf-8-sig')
-df = df.drop(columns=['날짜', '등락률', '기타법인', '개인'])
+df = stock.get_market_ohlcv_by_date(start_date, end_date, code)
+print(df.head())
+
+# adding RSI Index
+df['RSI'] = ta.momentum.rsi(df['종가'], window = 14)
+
+df_trading = stock.get_market_trading_value_by_date(start_date, end_date, code)
+
+df_close = df['종가']
+df = df.drop(columns=['종가'])
+
+df_last_actual_price = df_close[-future_seq:]
+# print(df_last_actual_price.to_numpy())
+
+df_combined = pd.concat([df, df_trading, df_close], axis = 1)
+
+df_combined.to_csv(f"./{stock_name}.csv", encoding="utf-8-sig")  # utf-8-sig는 한글 깨짐 방지용
+df = pd.read_csv(f'{stock_name}.csv', encoding='utf-8-sig')
+
+# 필요 없는 행 제거
+df = df.drop(columns=['날짜', '등락률', '기타법인', '개인', '전체'])
+
+# 마지막 실제 데이터 제외
+df = df.iloc[:-future_seq]
 df = df.apply(pd.to_numeric, errors='coerce')
 df = df.dropna()
 xy = df.to_numpy()
@@ -185,20 +214,13 @@ print("Learning finished!")
 lstm.eval()
 test_predict = lstm(testX)  # shape: [test_samples, future_seq, num_classes]
 
-# Plot predictions for the first test sample (예시)
-test_predict_np = test_predict[-1].data.cpu().numpy()  # shape: [future_seq, num_classes]
-testY_np = testY[-1].data.cpu().numpy()
-
-plt.plot(testY_np, label="actual price")
-plt.plot(test_predict_np, label="predicted price")
-plt.xlabel("Future Time (Days)")
-plt.ylabel("Stock Price")
-plt.legend()
-plt.savefig("./stock_prediction_torch_many_to_many.png")
-
 # Next future prediction using the latest time window
 # 최근 seq_length일 데이터를 입력으로 하여 앞으로 future_seq일 치 예측
-last_window = xy[-seq_length:]  # shape: [seq_length, input_size]
+last_window_index = seq_length + future_seq
+last_window = xy[-last_window_index:]  # shape: [seq_length, input_size]
+print(last_window[-1:])
+print("MAX: ", target_max)
+print("MIN: ", target_min)
 last_window_tensor = torch.Tensor(last_window).unsqueeze(0).to(device)  # add batch dimension
 
 lstm.eval()
@@ -208,3 +230,13 @@ with torch.no_grad():
 # Inverse scaling for prediction (단, num_classes=1로 가정)
 next_pred_original = next_pred * (target_max - target_min) + target_min
 print("Next future predicted prices (original scale):\n", next_pred_original)
+
+last_prediction = next_pred_original.to('cpu').view(future_seq, num_classes)
+
+plt.title(f"{stock_name}")
+plt.plot(df_last_actual_price.to_numpy(), label="actual price")
+plt.plot(last_prediction, label="predicted price")
+plt.xlabel("Days")
+plt.ylabel("Stock Price")
+plt.legend()
+plt.savefig("./stock_prediction_torch_many_to_many.png")
