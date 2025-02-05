@@ -1,7 +1,7 @@
+import math
 from pykrx import stock
 import ta
 import ta.momentum
-
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -30,6 +30,10 @@ num_classes = 1
 timesteps = seq_length = 60
 future_seq = 15  # 예측하고자 하는 미래 시퀀스 길이
 
+d_model = 64         # 내부 임베딩 차원
+nhead = 4            # 멀티헤드 Attention의 head 수
+dropout = 0.1
+
 weight_decay = 1e-4
 early_stopping_patience = 500
 early_stopping_delta = 1e-4
@@ -37,29 +41,25 @@ early_stopping_delta = 1e-4
 start_date = "20150101"
 end_date = "20250204"
 code = "035420"
-stock_name = 'SK하이닉스'
+stock_name = '네이버'
 
-## 새 종목을 훈련할 때만 True
-FLAG = False
+df = stock.get_market_ohlcv_by_date(start_date, end_date, code)
+print(df.head())
 
-if FLAG:
-    df = stock.get_market_ohlcv_by_date(start_date, end_date, code)
-    print(df.head())
+# adding RSI Index
+df['RSI'] = ta.momentum.rsi(df['종가'], window = 14)
 
-    # adding RSI Index
-    df['RSI'] = ta.momentum.rsi(df['종가'], window = 14)
+df_trading = stock.get_market_trading_value_by_date(start_date, end_date, code)
 
-    df_trading = stock.get_market_trading_value_by_date(start_date, end_date, code)
+df_close = df['종가']
+df = df.drop(columns=['종가'])
 
-    df_close = df['종가']
-    df = df.drop(columns=['종가'])
+df_last_actual_price = df_close[-future_seq:]
+# print(df_last_actual_price.to_numpy())
 
-    df_last_actual_price = df_close[-future_seq:]
-    # print(df_last_actual_price.to_numpy())
+df_combined = pd.concat([df, df_trading, df_close], axis = 1)
 
-    df_combined = pd.concat([df, df_trading, df_close], axis = 1)
-
-    df_combined.to_csv(f"./{stock_name}.csv", encoding="utf-8-sig")  # utf-8-sig는 한글 깨짐 방지용
+df_combined.to_csv(f"./{stock_name}.csv", encoding="utf-8-sig")  # utf-8-sig는 한글 깨짐 방지용
 
 df = pd.read_csv(f'{stock_name}.csv', encoding='utf-8-sig')
 
@@ -110,6 +110,71 @@ device = (
 print(f"\nUsing {device} device")
 print("GPU: ", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "None")
 
+# Positional Encoding 모듈 (공식 예제 참고)
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, dropout=0.1, max_len=5000):
+        """
+        d_model: 임베딩 차원
+        dropout: 드롭아웃 확률
+        max_len: 최대 시퀀스 길이
+        """
+        super(PositionalEncoding, self).__init__()
+        self.dropout = nn.Dropout(p=dropout)
+        
+        # 위치 인코딩 행렬 초기화
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        # 주기적 함수를 위한 분모 계수
+        div_term = torch.exp(torch.arange(0, d_model, 2, dtype=torch.float) * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)  # 짝수 인덱스에 sin 적용
+        pe[:, 1::2] = torch.cos(position * div_term)  # 홀수 인덱스에 cos 적용
+        pe = pe.unsqueeze(0)  # 배치 차원 추가
+        self.register_buffer('pe', pe)  # 학습 파라미터로 등록하지 않음
+
+    def forward(self, x):
+        """
+        x: [batch_size, seq_length, d_model]
+        """
+        x = x + self.pe[:, :x.size(1)]
+        return self.dropout(x)
+
+# Transformer 기반 시계열 예측 모델
+class TransformerModel(nn.Module):
+    def __init__(self, input_size, d_model, nhead, num_layers, num_classes, dropout=0.1):
+        """
+        input_size: 입력 피처 수 (예: 시계열의 각 시점에 대한 피처 수)
+        d_model: Transformer 내부 임베딩 차원
+        nhead: 멀티헤드 Attention의 head 수
+        num_layers: Transformer Encoder의 레이어 수
+        num_classes: 출력 차원 (예측할 값의 수, 보통 1)
+        dropout: 드롭아웃 확률
+        """
+        super(TransformerModel, self).__init__()
+        self.d_model = d_model
+        # 입력 피처를 d_model 차원으로 선형 변환
+        self.input_linear = nn.Linear(input_size, d_model)
+        self.pos_encoder = PositionalEncoding(d_model, dropout)
+        encoder_layers = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, dropout=dropout)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers=num_layers)
+        # 예측을 위한 최종 FC 레이어
+        self.fc = nn.Linear(d_model, num_classes)
+
+    def forward(self, src):
+        """
+        src: [batch_size, seq_length, input_size]
+        """
+        # 입력 선형 변환 및 스케일 조정
+        src = self.input_linear(src) * math.sqrt(self.d_model)
+        # Positional Encoding 추가
+        src = self.pos_encoder(src)
+        # nn.TransformerEncoder는 입력 shape이 [seq_length, batch_size, d_model]이어야 함
+        src = src.transpose(0, 1)  # shape: [seq_length, batch_size, d_model]
+        output = self.transformer_encoder(src)
+        # 마지막 시점의 출력을 사용하여 예측 (또는 필요에 따라 전체 시퀀스를 활용)
+        output = output[-1, :, :]  # shape: [batch_size, d_model]
+        output = self.fc(output)   # shape: [batch_size, num_classes]
+        return output
+
 # Train/Test split
 train_size = int(len(dataX) * 0.8)
 test_size = len(dataX) - train_size
@@ -141,76 +206,32 @@ class EarlyStopping:
             self.best_loss = val_loss
             self.counter = 0
 
-# -------------------------------
-# 2. LSTM 모델 (Many-to-Many 추가)
-# -------------------------------
-class LSTM(nn.Module):
-    def __init__(self, num_classes, input_size, hidden_size, num_layers, future_seq):
-        super(LSTM, self).__init__()
-        self.num_classes = num_classes
-        self.num_layers = num_layers
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.seq_length = seq_length
-        self.future_seq = future_seq
 
-        self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
-                            num_layers=num_layers, batch_first=True)
-        # 최종 FC layer: 출력 차원 = num_classes * future_seq
-        self.fc = nn.Linear(hidden_size, num_classes * future_seq)
-
-    def forward(self, x):
-        # Initialize hidden and cell states
-        h_0 = Variable(torch.zeros(self.num_layers, x.size(0), self.hidden_size)).to(device)
-        c_0 = Variable(torch.zeros(self.num_layers, x.size(0), self.hidden_size)).to(device)
-
-        # LSTM 순전파
-        _, (h_out, _) = self.lstm(x, (h_0, c_0))
-        # h_out shape: [num_layers, batch_size, hidden_size] -> 마지막 레이어 사용
-        h_out = h_out[-1]  # shape: [batch_size, hidden_size]
-        out = self.fc(h_out)  # shape: [batch_size, num_classes * future_seq]
-        # reshape해서 many-to-many 형태로 변환 (예: [batch_size, future_seq, num_classes])
-        out = out.view(-1, self.future_seq, self.num_classes)
-        return out
-
-def init_weights(m):
-    if isinstance(m, nn.Linear):
-        nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
-        if m.bias is not None:
-            nn.init.zeros_(m.bias)
-
-# Instantiate and initialize model
-lstm = LSTM(num_classes, input_size, hidden_size, num_layers, future_seq)
-lstm.apply(init_weights)
-lstm = lstm.to(device)
-
-if not FLAG:
-    lstm.load_state_dict(torch.load('model.pth'))
-    print("model loaded")
-
-# Loss and optimizer
-criterion = torch.nn.MSELoss()  # Mean Squared Error for regression
-optimizer = torch.optim.Adam(lstm.parameters(), lr=learning_rate, weight_decay=weight_decay)
+# 모델, 손실함수, 옵티마이저 생성
+model = TransformerModel(input_size, d_model, nhead, num_layers, num_classes, dropout)
+model = model.to(device)
+criterion = nn.MSELoss()
+optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
 
 # Setup EarlyStopping
 early_stopping = EarlyStopping(patience=early_stopping_patience, delta=early_stopping_delta)
 
 # Training Loop with EarlyStopping
 for epoch in range(num_epochs):
-    lstm.train()
+    model.train()
     optimizer.zero_grad()
-    outputs = lstm(trainX)  # outputs shape: [batch, future_seq, num_classes]
+    outputs = model(trainX)  # outputs shape: [batch, future_seq, num_classes]
     loss = criterion(outputs, trainY)
     loss.backward()
-    torch.nn.utils.clip_grad_norm_(lstm.parameters(), max_norm=1.0)
+    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
     optimizer.step()
 
     # Compute validation loss on test set
-    lstm.eval()
+    model.eval()
     with torch.no_grad():
-        val_outputs = lstm(testX)
+        val_outputs = model(testX)
         val_loss = criterion(val_outputs, testY)
-    lstm.train()  # switch back to training mode
+    model.train()  # switch back to training mode
 
     early_stopping(val_loss.item())
 
@@ -223,8 +244,8 @@ for epoch in range(num_epochs):
 print("Learning finished!")
 
 # Testing the model
-lstm.eval()
-test_predict = lstm(testX)  # shape: [test_samples, future_seq, num_classes]
+model.eval()
+test_predict = model(testX)  # shape: [test_samples, future_seq, num_classes]
 
 # Next future prediction using the latest time window
 # 최근 seq_length일 데이터를 입력으로 하여 앞으로 future_seq일 치 예측
@@ -235,9 +256,9 @@ print("MAX: ", target_max)
 print("MIN: ", target_min)
 last_window_tensor = torch.Tensor(last_window).unsqueeze(0).to(device)  # add batch dimension
 
-lstm.eval()
+model.eval()
 with torch.no_grad():
-    next_pred = lstm(last_window_tensor)  # shape: [1, future_seq, num_classes]
+    next_pred = model(last_window_tensor)  # shape: [1, future_seq, num_classes]
 
 # Inverse scaling for prediction (단, num_classes=1로 가정)
 next_pred_original = next_pred * (target_max - target_min) + target_min
@@ -252,6 +273,3 @@ plt.xlabel("Days")
 plt.ylabel("Stock Price")
 plt.legend()
 plt.savefig("./stock_prediction_torch_many_to_many.png")
-
-if not FLAG:
-    torch.save(lstm.state_dict(), './model.pth')
