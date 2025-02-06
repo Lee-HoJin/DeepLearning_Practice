@@ -58,7 +58,7 @@ early_stopping_patience = 500
 early_stopping_delta = 1e-4
 
 start_date = "20150101"
-end_date = "20250204"
+end_date = "20250205"
 
 file_path = f"./stocks/{stock_name}.csv"
 
@@ -287,4 +287,4 @@ plt.plot(test_predict, label="predicted price")
 plt.xlabel("Time Period")
 plt.ylabel("Stock Price")
 plt.legend()
-plt.savefig("./stock_prediction_torch_LSTM_M2O.png")
+plt.savefig("./stock_prediction_LSTM_M2O.png")
