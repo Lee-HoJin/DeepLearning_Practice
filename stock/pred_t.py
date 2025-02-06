@@ -21,7 +21,7 @@ if "DISPLAY" not in os.environ:
     matplotlib.use('Agg')
 
 # Train Parameters
-num_layers = 2  # number of layers in RNN
+num_layers = 3  # number of layers in RNN
 learning_rate = 0.0005
 num_epochs = 5000
 input_size = 8
@@ -274,4 +274,4 @@ plt.plot(last_prediction, label="predicted price")
 plt.xlabel("Days")
 plt.ylabel("Stock Price")
 plt.legend()
-plt.savefig("./stock_prediction_torch_many_to_many.png")
+plt.savefig("./stock_prediction_torch_transformer.png")
