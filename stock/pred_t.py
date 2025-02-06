@@ -43,28 +43,27 @@ end_date = "20250204"
 code = "035420"
 stock_name = '네이버'
 
-df = stock.get_market_ohlcv_by_date(start_date, end_date, code)
-print(df.head())
+FLAG = False
 
-# adding RSI Index
-df['RSI'] = ta.momentum.rsi(df['종가'], window = 14)
+if FLAG:
+    df = stock.get_market_ohlcv_by_date(start_date, end_date, code)
+    print(df.head())
 
-df_trading = stock.get_market_trading_value_by_date(start_date, end_date, code)
+    # adding RSI Index
+    df['RSI'] = ta.momentum.rsi(df['종가'], window = 14)
 
-df_close = df['종가']
-df = df.drop(columns=['종가'])
+    df_trading = stock.get_market_trading_value_by_date(start_date, end_date, code)
 
-df_last_actual_price = df_close[-future_seq:]
-# print(df_last_actual_price.to_numpy())
+    df_close = df['종가']
+    df = df.drop(columns=['종가'])
 
-df_combined = pd.concat([df, df_trading, df_close], axis = 1)
+    df_combined = pd.concat([df, df_trading, df_close], axis = 1)
 
-df_combined.to_csv(f"./{stock_name}.csv", encoding="utf-8-sig")  # utf-8-sig는 한글 깨짐 방지용
+    df_combined.to_csv(f"./{stock_name}.csv", encoding="utf-8-sig")  # utf-8-sig는 한글 깨짐 방지용
 
 df = pd.read_csv(f'{stock_name}.csv', encoding='utf-8-sig')
 
 df_last_actual_price = df['종가'][-future_seq:]
-
 
 # 필요 없는 행 제거
 df = df.drop(columns=['날짜', '등락률', '기타법인', '개인', '전체'])
