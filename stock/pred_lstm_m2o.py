@@ -48,10 +48,10 @@ num_layers = 3  # number of layers in RNN
 learning_rate = 0.0005
 num_epochs = 5000
 
-hidden_size = 128
+hidden_size = 256
 num_classes = 1
 timesteps = seq_length = 30
-input_size = 8
+input_size = 10
 
 weight_decay = 1e-4
 early_stopping_patience = 500
@@ -70,6 +70,10 @@ if not os.path.exists(file_path):
 
     # adding RSI Index
     df['RSI'] = ta.momentum.rsi(df['종가'], window = 14)
+    
+    # adding EMA (이평선)
+    df["EMA_20"] = ta.trend.ema_indicator(df["종가"], window=20)
+    df["EMA_60"] = ta.trend.ema_indicator(df["종가"], window=60)
 
     df_trading = stock.get_market_trading_value_by_date(start_date, end_date, code)
 

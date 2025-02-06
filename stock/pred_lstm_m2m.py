@@ -44,22 +44,22 @@ if __name__ == "__main__":
 
 
 # Train Parameters
-num_layers = 3  # number of layers in RNN
-learning_rate = 0.0005
+num_layers = 2  # number of layers in RNN
+learning_rate = 0.001
 num_epochs = 5000
 
-hidden_size = 128
+hidden_size = 32
 input_size = 10
 num_classes = 1
-timesteps = seq_length = 30
-future_seq = 10
+timesteps = seq_length = 100
+future_seq = 15
 
-weight_decay = 1e-4
+weight_decay = 1e-2
 early_stopping_patience = 500
 early_stopping_delta = 1e-4
 
 start_date = "20150101"
-end_date = "20250204"
+end_date = "20250205"
 
 file_path = f"./stocks/{stock_name}.csv"
 
