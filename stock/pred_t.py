@@ -45,18 +45,18 @@ if __name__ == "__main__":
 
 # Train Parameters
 num_layers = 2  # number of layers in RNN
-learning_rate = 0.001
+learning_rate = 0.0005
 num_epochs = 5000
 input_size = 8
 num_classes = 1
 timesteps = seq_length = 30
 future_seq = 15  # 예측하고자 하는 미래 시퀀스 길이
 
-d_model = 16         # 내부 임베딩 차원
-nhead = 2            # 멀티헤드 Attention의 head 수
+d_model = 32         # 내부 임베딩 차원
+nhead = 8            # 멀티헤드 Attention의 head 수
 dropout = 0.1
 
-weight_decay = 1e-4
+weight_decay = 1e-5
 early_stopping_patience = 500
 early_stopping_delta = 1e-4
 
@@ -69,7 +69,7 @@ if not os.path.exists(file_path):
     print(f"파일이 존재하지 않습니다. {stock_name} 데이터를 다운로드합니다...")
 
     df = stock.get_market_ohlcv_by_date(start_date, end_date, code)
-    print(df.head())
+    # print(df.head())
 
     # adding RSI Index
     df['RSI'] = ta.momentum.rsi(df['종가'], window = 14)
@@ -85,6 +85,7 @@ if not os.path.exists(file_path):
     print(f"{stock_name} 데이터 저장 완료!")
 
 df = pd.read_csv(file_path, encoding='utf-8-sig')
+print(df.head(3))
 
 df_last_actual_price = df['종가'][-future_seq:]
 
@@ -177,7 +178,8 @@ class TransformerModel(nn.Module):
         # 입력 피처를 d_model 차원으로 선형 변환
         self.input_linear = nn.Linear(input_size, d_model)
         self.pos_encoder = PositionalEncoding(d_model, dropout)
-        encoder_layers = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, dropout=dropout)
+        
+        encoder_layers = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, dropout=dropout, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers=num_layers)
         # 예측을 위한 최종 FC 레이어
         self.fc = nn.Linear(d_model, num_classes * future_seq)
@@ -276,9 +278,6 @@ test_predict = model(testX)  # shape: [test_samples, future_seq, num_classes]
 # 최근 seq_length일 데이터를 입력으로 하여 앞으로 future_seq일 치 예측
 last_window_index = seq_length + future_seq
 last_window = xy[-last_window_index:]  # shape: [seq_length, input_size]
-print(last_window[-1:])
-print("MAX: ", target_max)
-print("MIN: ", target_min)
 last_window_tensor = torch.Tensor(last_window).unsqueeze(0).to(device)  # add batch dimension
 
 model.eval()
