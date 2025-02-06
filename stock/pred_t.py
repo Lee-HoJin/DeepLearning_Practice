@@ -31,7 +31,7 @@ def get_stock_code_by_name(name: str) -> str:
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("사용법: python3 pred_t.py [종목명]")
+        print("종목명을 함께 입력해주세요\npython3 pred_t.py [종목명]")
         sys.exit(1)
 
     stock_name = sys.argv[1]  # 터미널에서 입력한 종목명
@@ -53,7 +53,7 @@ timesteps = seq_length = 30
 future_seq = 15  # 예측하고자 하는 미래 시퀀스 길이
 
 d_model = 16         # 내부 임베딩 차원
-nhead = 4            # 멀티헤드 Attention의 head 수
+nhead = 2            # 멀티헤드 Attention의 head 수
 dropout = 0.1
 
 weight_decay = 1e-4
@@ -63,9 +63,11 @@ early_stopping_delta = 1e-4
 start_date = "20150101"
 end_date = "20250204"
 
-FLAG = True
+file_path = f"./stocks/{stock_name}.csv"
 
-if FLAG:
+if not os.path.exists(file_path):
+    print(f"파일이 존재하지 않습니다. {stock_name} 데이터를 다운로드합니다...")
+
     df = stock.get_market_ohlcv_by_date(start_date, end_date, code)
     print(df.head())
 
@@ -80,8 +82,9 @@ if FLAG:
     df_combined = pd.concat([df, df_trading, df_close], axis = 1)
 
     df_combined.to_csv(f"./stocks/{stock_name}.csv", encoding="utf-8-sig")  # utf-8-sig는 한글 깨짐 방지용
+    print(f"{stock_name} 데이터 저장 완료!")
 
-df = pd.read_csv(f'./stocks/{stock_name}.csv', encoding='utf-8-sig')
+df = pd.read_csv(file_path, encoding='utf-8-sig')
 
 df_last_actual_price = df['종가'][-future_seq:]
 
