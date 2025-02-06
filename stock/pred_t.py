@@ -1,3 +1,4 @@
+import sys
 import math
 from pykrx import stock
 import ta
@@ -19,18 +20,39 @@ torch.manual_seed(777)  # reproducibility
 if "DISPLAY" not in os.environ:
     # remove Travis CI Error
     matplotlib.use('Agg')
+    
+def get_stock_code_by_name(name: str) -> str:
+    """종목 이름을 입력하면 종목 코드를 반환"""
+    stock_list = stock.get_market_ticker_list(market="ALL")  # 코스피 & 코스닥 전체
+    for code in stock_list:
+        if stock.get_market_ticker_name(code) == name:
+            return code
+    return None  # 해당하는 종목이 없을 경우 None 반환
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("사용법: python3 pred_t.py [종목명]")
+        sys.exit(1)
+
+    stock_name = sys.argv[1]  # 터미널에서 입력한 종목명
+    code = get_stock_code_by_name(stock_name)
+
+    if code:
+        print(f"종목명: {stock_name}, 종목 코드: {code}")
+    else:
+        print(f"'{stock_name}'에 해당하는 종목 코드를 찾을 수 없습니다.")
+
 
 # Train Parameters
-num_layers = 3  # number of layers in RNN
-learning_rate = 0.0005
+num_layers = 2  # number of layers in RNN
+learning_rate = 0.001
 num_epochs = 5000
 input_size = 8
-hidden_size = 8
 num_classes = 1
 timesteps = seq_length = 30
 future_seq = 15  # 예측하고자 하는 미래 시퀀스 길이
 
-d_model = 64         # 내부 임베딩 차원
+d_model = 16         # 내부 임베딩 차원
 nhead = 4            # 멀티헤드 Attention의 head 수
 dropout = 0.1
 
@@ -40,10 +62,8 @@ early_stopping_delta = 1e-4
 
 start_date = "20150101"
 end_date = "20250204"
-code = "035420"
-stock_name = '네이버'
 
-FLAG = False
+FLAG = True
 
 if FLAG:
     df = stock.get_market_ohlcv_by_date(start_date, end_date, code)
@@ -59,9 +79,9 @@ if FLAG:
 
     df_combined = pd.concat([df, df_trading, df_close], axis = 1)
 
-    df_combined.to_csv(f"./{stock_name}.csv", encoding="utf-8-sig")  # utf-8-sig는 한글 깨짐 방지용
+    df_combined.to_csv(f"./stocks/{stock_name}.csv", encoding="utf-8-sig")  # utf-8-sig는 한글 깨짐 방지용
 
-df = pd.read_csv(f'{stock_name}.csv', encoding='utf-8-sig')
+df = pd.read_csv(f'./stocks/{stock_name}.csv', encoding='utf-8-sig')
 
 df_last_actual_price = df['종가'][-future_seq:]
 
