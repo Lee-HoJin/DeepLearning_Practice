@@ -21,13 +21,13 @@ if "DISPLAY" not in os.environ:
     matplotlib.use('Agg')
 
 # Train Parameters
-num_layers = 4  # number of layers in RNN
+num_layers = 2  # number of layers in RNN
 learning_rate = 0.0005
 num_epochs = 5000
 input_size = 8
 hidden_size = 8
 num_classes = 1
-timesteps = seq_length = 60
+timesteps = seq_length = 30
 future_seq = 15  # 예측하고자 하는 미래 시퀀스 길이
 
 d_model = 64         # 내부 임베딩 차원
@@ -139,7 +139,7 @@ class PositionalEncoding(nn.Module):
 
 # Transformer 기반 시계열 예측 모델
 class TransformerModel(nn.Module):
-    def __init__(self, input_size, d_model, nhead, num_layers, num_classes, dropout=0.1):
+    def __init__(self, input_size, d_model, nhead, num_layers, num_classes, future_seq, dropout=0.1):
         """
         input_size: 입력 피처 수 (예: 시계열의 각 시점에 대한 피처 수)
         d_model: Transformer 내부 임베딩 차원
@@ -150,13 +150,14 @@ class TransformerModel(nn.Module):
         """
         super(TransformerModel, self).__init__()
         self.d_model = d_model
+        self.future_seq = future_seq
         # 입력 피처를 d_model 차원으로 선형 변환
         self.input_linear = nn.Linear(input_size, d_model)
         self.pos_encoder = PositionalEncoding(d_model, dropout)
         encoder_layers = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, dropout=dropout)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers=num_layers)
         # 예측을 위한 최종 FC 레이어
-        self.fc = nn.Linear(d_model, num_classes)
+        self.fc = nn.Linear(d_model, num_classes * future_seq)
 
     def forward(self, src):
         """
@@ -172,6 +173,8 @@ class TransformerModel(nn.Module):
         # 마지막 시점의 출력을 사용하여 예측 (또는 필요에 따라 전체 시퀀스를 활용)
         output = output[-1, :, :]  # shape: [batch_size, d_model]
         output = self.fc(output)   # shape: [batch_size, num_classes]
+         # many-to-many 형태로 reshape (예: [batch_size, 15, 1])
+        output = output.view(-1, self.future_seq, num_classes)
         return output
 
 # Train/Test split
@@ -207,7 +210,7 @@ class EarlyStopping:
 
 
 # 모델, 손실함수, 옵티마이저 생성
-model = TransformerModel(input_size, d_model, nhead, num_layers, num_classes, dropout)
+model = TransformerModel(input_size, d_model, nhead, num_layers, num_classes, future_seq, dropout)
 model = model.to(device)
 criterion = nn.MSELoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
