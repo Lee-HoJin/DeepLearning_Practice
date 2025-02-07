@@ -59,7 +59,7 @@ def imshow(img):
 
 # get some random training images
 dataiter = iter(trainloader)
-images, labels = dataiter.next()
+images, labels = next(dataiter)
 vis.images(images/2 + 0.5)
 
 # show images
@@ -127,7 +127,7 @@ epochs = 50
 
 for epoch in range(epochs):  # loop over the dataset multiple times
     running_loss = 0.0
-    lr_sche.step()
+    
     for i, data in enumerate(trainloader, 0):
         # get the inputs
         inputs, labels = data
@@ -150,12 +150,14 @@ for epoch in range(epochs):  # loop over the dataset multiple times
             print('[%d, %5d] loss: %.3f' %
                   (epoch + 1, i + 1, running_loss / 30))
             running_loss = 0.0
+            
+    lr_sche.step()
         
 
 print('Finished Training')
 
 dataiter = iter(testloader)
-images, labels = dataiter.next()
+images, labels = next(dataiter)
 
 # print images
 imshow(torchvision.utils.make_grid(images))
