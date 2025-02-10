@@ -44,15 +44,15 @@ if __name__ == "__main__":
 
 
 # Train Parameters
-num_layers = 2  # number of layers in RNN
+num_layers = 4  # number of layers in RNN
 learning_rate = 0.0005
 num_epochs = 5000
-input_size = 8
+input_size = 10
 num_classes = 1
-timesteps = seq_length = 30
+timesteps = seq_length = 100
 future_seq = 15  # 예측하고자 하는 미래 시퀀스 길이
 
-d_model = 32         # 내부 임베딩 차원
+d_model = 64         # 내부 임베딩 차원
 nhead = 8            # 멀티헤드 Attention의 head 수
 dropout = 0.1
 
@@ -61,7 +61,7 @@ early_stopping_patience = 500
 early_stopping_delta = 1e-4
 
 start_date = "20150101"
-end_date = "20250204"
+end_date = "20250205"
 
 file_path = f"./stocks/{stock_name}.csv"
 
@@ -73,6 +73,10 @@ if not os.path.exists(file_path):
 
     # adding RSI Index
     df['RSI'] = ta.momentum.rsi(df['종가'], window = 14)
+
+    # adding EMA (이평선)
+    df["EMA_20"] = ta.trend.ema_indicator(df["종가"], window=20)
+    df["EMA_60"] = ta.trend.ema_indicator(df["종가"], window=60)
 
     df_trading = stock.get_market_trading_value_by_date(start_date, end_date, code)
 
@@ -97,6 +101,8 @@ df = df.iloc[:-future_seq]
 df = df.apply(pd.to_numeric, errors='coerce')
 df = df.dropna()
 xy = df.to_numpy()
+
+print(df.head(3))
 
 # 종가 열의 최소/최대 값 저장 (inverse scaling용)
 target_min = np.min(xy[:, -1])
@@ -296,4 +302,4 @@ plt.plot(last_prediction, label="predicted price")
 plt.xlabel("Days")
 plt.ylabel("Stock Price")
 plt.legend()
-plt.savefig("./stock_prediction_torch_transformer.png")
+plt.savefig("./stock_prediction_transformer_M2M.png")
