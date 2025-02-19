@@ -23,7 +23,7 @@ REPLAY_MEMORY = 50000  # Replay memory 크기
 
 # PyTorch 버전 DQN 클래스
 class DQN(nn.Module):
-    def __init__(self, input_size, output_size, h_size=10, lr=1e-1):
+    def __init__(self, input_size, output_size, h_size=20, lr=1e-2):
         super(DQN, self).__init__()
         self.fc1 = nn.Linear(input_size, h_size)
         self.fc2 = nn.Linear(h_size, output_size)
