@@ -4,6 +4,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from collections import deque
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 import gym
 
 # 환경 설정
@@ -15,12 +18,15 @@ output_size = env.action_space.n  # 행동 (2)
 dis = 0.99  # 할인율
 REPLAY_MEMORY = 50000
 batch_size = 64  # 미니배치 크기
-update_target_freq = 20  # Target DQN 업데이트 주기
+update_target_freq = 10  # Target DQN 업데이트 주기
 alpha = 0.1  # Q-learning 업데이트 가중치
+tau = 0.005  # Target DQN soft update 비율
+min_buffer_size = 1000  # 최소 Replay Buffer 크기
+epsilon_decay = 0.995  # Epsilon 지수 감소율
 
 # DQN 신경망 정의
 class DQN(nn.Module):
-    def __init__(self, input_size, output_size, h_size=32, lr=0.001):
+    def __init__(self, input_size, output_size, h_size=64, lr=0.001):
         super(DQN, self).__init__()
         self.fc1 = nn.Linear(input_size, h_size)
         self.fc2 = nn.Linear(h_size, h_size)
@@ -72,6 +78,11 @@ def simple_replay_train(mainDQN, targetDQN, train_batch):
 
     return mainDQN.update(x_stack, y_stack)
 
+# Target 네트워크 Soft Update
+def soft_update_target(mainDQN, targetDQN, tau):
+    for main_param, target_param in zip(mainDQN.parameters(), targetDQN.parameters()):
+        target_param.data.copy_(tau * main_param.data + (1 - tau) * target_param.data)
+
 # 학습 루프
 def main():
     max_episodes = 5000
@@ -81,15 +92,19 @@ def main():
     targetDQN = DQN(input_size, output_size)
     targetDQN.load_state_dict(mainDQN.state_dict())
 
+    epsilon = 1.0  # 초기 epsilon 값 설정
+
+    steps_list = []  # 각 에피소드에서의 steps를 저장할 리스트
+
     for episode in range(max_episodes):
-        e = max(0.01, 1.0 - episode / 5000)  # Epsilon 선형 감소
+        epsilon = max(0.01, epsilon * epsilon_decay)  # Epsilon 지수 감소 적용
         done = False
         step_count = 0
 
         state = env.reset()
 
         while not done:
-            if np.random.rand(1) < e:
+            if np.random.rand(1) < epsilon:
                 action = env.action_space.sample()
             else:
                 action = np.argmax(mainDQN.predict(state))
@@ -97,7 +112,7 @@ def main():
             next_state, reward, done, _ = env.step(action)
 
             if done:
-                reward = -10  # 실패하면 보상 패널티
+                reward = -100  # 실패하면 보상 패널티
 
             replay_buffer.append((state, action, reward, next_state, done))
 
@@ -106,18 +121,29 @@ def main():
             if step_count > 10000:
                 break
 
-        print(f"Episode: {episode + 1} steps: {step_count}")
+        steps_list.append(step_count)  # steps 저장
+        print(f"Episode: {episode} steps: {step_count}")
 
-        if len(replay_buffer) > batch_size and episode % 10 == 1:
-            print(f"Training at episode {episode + 1}...")
+        # 경험이 충분히 쌓일 때까지 학습하지 않음
+        if len(replay_buffer) > min_buffer_size and episode % 10 == 1:
+            print(f"Training at episode {episode}...")
             for i in range(10):
                 minibatch = random.sample(replay_buffer, batch_size)
                 loss = simple_replay_train(mainDQN, targetDQN, minibatch)
                 print(f"Batch {i+1}/10 - Loss: {loss:.4f}")
 
-        if episode % update_target_freq == 0:
-            targetDQN.load_state_dict(mainDQN.state_dict())
-            print("Target network updated!")
+        # Target 네트워크 Soft Update 적용
+        soft_update_target(mainDQN, targetDQN, tau)
+
+    # 학습 종료 후 그래프 그리기
+    plt.figure(figsize=(10, 5))
+    plt.plot(steps_list, label='Steps per Episode')
+    plt.xlabel('Episode')
+    plt.ylabel('Steps')
+    plt.title('Steps per Episode Over Training')
+    plt.legend()
+    # plt.show()
+    plt.savefig("Steps_plotted.png")
 
 if __name__ == "__main__":
     main()
