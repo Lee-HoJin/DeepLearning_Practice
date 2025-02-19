@@ -48,23 +48,24 @@ class DQN(nn.Module):
         self.optimizer.step()
         return loss.item()
 
-# Replay memory 학습 함수
-def simple_replay_train(DQN, train_batch):
-    x_stack = np.empty((0, DQN.fc1.in_features))
-    y_stack = np.empty((0, DQN.fc2.out_features))
+# Target DQN을 사용한 학습 함수
+def simple_replay_train(mainDQN, targetDQN, train_batch):
+    x_stack = np.empty((0, mainDQN.fc1.in_features))
+    y_stack = np.empty((0, mainDQN.fc2.out_features))
 
     for state, action, reward, next_state, done in train_batch:
-        Q = DQN.predict(state)
+        Q = mainDQN.predict(state)
 
         if done:
             Q[0, action] = reward
         else:
-            Q[0, action] = reward + dis * np.max(DQN.predict(next_state))
+            # Target DQN을 사용하여 안정적인 학습
+            Q[0, action] = reward + dis * np.max(targetDQN.predict(next_state))
 
         x_stack = np.vstack([x_stack, state])
         y_stack = np.vstack([y_stack, Q])
 
-    return DQN.update(x_stack, y_stack)
+    return mainDQN.update(x_stack, y_stack)
 
 # 학습된 모델 테스트
 def bot_replay(mainDQN):
@@ -91,11 +92,14 @@ def bot_replay(mainDQN):
 # 메인 학습 함수
 def main():
     max_episodes = 5000
+    update_target_freq = 10 # 10 에피소드마다 target network 업데이트
 
     # Replay memory
     replay_buffer = deque(maxlen=REPLAY_MEMORY)
 
     mainDQN = DQN(input_size, output_size)
+    targetDQN = DQN(input_size, output_size) # 추가된 Target Network
+    targetDQN.load_state_dict(mainDQN.state_dict()) # 초기 가중치 복사
 
     for episode in range(max_episodes):
         e = 1. / ((episode / 10) + 1)  # Epsilon-greedy 방식으로 탐색 비율 조정
@@ -127,10 +131,16 @@ def main():
             pass
 
         if episode % 10 == 1:  # 10 에피소드마다 학습
-            for _ in range(50):
+            for _ in range(10):
                 minibatch = random.sample(replay_buffer, min(len(replay_buffer), 10))
-                loss = simple_replay_train(mainDQN, minibatch)
-            print("Loss: ", loss)
+                loss = simple_replay_train(mainDQN, targetDQN,minibatch)
+                print(f"Batch {i+1}/10 - Loss: {loss:.4f}")
+            # print("Loss: ", loss)
+
+         # Target 네트워크 업데이트 (10 에피소드마다)
+        if episode % update_target_freq == 0:
+            targetDQN.load_state_dict(mainDQN.state_dict())
+            print("Target network updated!")
 
     bot_replay(mainDQN)
 
