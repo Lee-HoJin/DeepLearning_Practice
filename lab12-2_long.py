@@ -43,7 +43,6 @@ y_data = torch.LongTensor(dataY)
 
 # one hot encoding
 
-
 def one_hot(x, num_classes):
     idx = x.long()
     idx = idx.view(-1, 1)
