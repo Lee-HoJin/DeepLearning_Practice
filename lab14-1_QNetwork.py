@@ -8,68 +8,85 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+# Gym 환경 초기화
+env = gym.make('FrozenLake-v1', is_slippery=False)  # v0 -> v1로 변경됨
+num_states = env.observation_space.n
+num_actions = env.action_space.n
 
-env = gym.make('FrozenLake-v0')
+# 신경망 모델 정의
+class QNetwork(tf.keras.Model):
+    def __init__(self, num_states, num_actions):
+        super(QNetwork, self).__init__()
+        self.dense = tf.keras.layers.Dense(num_actions, activation=None,
+                                           kernel_initializer=tf.keras.initializers.RandomUniform(0, 0.01))
 
+    def call(self, state):
+        return self.dense(state)
 
-tf.reset_default_graph()
+# 모델 및 최적화 함수 설정
+model = QNetwork(num_states, num_actions)
+optimizer = tf.keras.optimizers.SGD(learning_rate=0.1)
 
-#These lines establish the feed-forward part of the network used to choose actions
-inputs1 = tf.placeholder(shape=[1,16],dtype=tf.float32)
-W = tf.Variable(tf.random_uniform([16,4],0,0.01))
-Qout = tf.matmul(inputs1,W)
-predict = tf.argmax(Qout,1)
+# 학습 파라미터 설정
+y = 0.99  # 할인율
+e = 0.1  # 탐색 확률
+num_episodes = 2000  # 에피소드 수
 
-#Below we obtain the loss by taking the sum of squares difference between the target and prediction Q values.
-nextQ = tf.placeholder(shape=[1,4],dtype=tf.float32)
-loss = tf.reduce_sum(tf.square(nextQ - Qout))
-trainer = tf.train.GradientDescentOptimizer(learning_rate=0.1)
-updateModel = trainer.minimize(loss)
-
-init = tf.global_variables_initializer()
-
-# Set learning parameters
-y = .99
-e = 0.1
-num_episodes = 2000
-#create lists to contain total rewards and steps per episode
+# 보상 및 단계 기록용 리스트
 jList = []
 rList = []
-with tf.Session() as sess:
-    sess.run(init)
-    for i in range(num_episodes):
-        #Reset environment and get first new observation
-        s = env.reset()
-        rAll = 0
-        d = False
-        j = 0
-        #The Q-Network
-        while j < 99:
-            j+=1
-            #Choose an action by greedily (with e chance of random action) from the Q-network
-            a,allQ = sess.run([predict,Qout],feed_dict={inputs1:np.identity(16)[s:s+1]})
-            if np.random.rand(1) < e:
-                a[0] = env.action_space.sample()
-            #Get new state and reward from environment
-            s1,r,d,_ = env.step(a[0])
-            #Obtain the Q' values by feeding the new state through our network
-            Q1 = sess.run(Qout,feed_dict={inputs1:np.identity(16)[s1:s1+1]})
-            #Obtain maxQ' and set our target value for chosen action.
-            maxQ1 = np.max(Q1)
-            targetQ = allQ
-            targetQ[0,a[0]] = r + y*maxQ1
-            #Train our network using target and predicted Q values
-            _,W1 = sess.run([updateModel,W],feed_dict={inputs1:np.identity(16)[s:s+1],nextQ:targetQ})
-            rAll += r
-            s = s1
-            if d == True:
-                #Reduce chance of random action as we train the model.
-                e = 1./((i/50) + 10)
-                break
-        jList.append(j)
-        rList.append(rAll)
-print("Percent of succesful episodes: " + str(sum(rList)/num_episodes) + "%")
 
-plt.plot(rList)
+# 학습 루프
+for i in range(num_episodes):
+    s, _ = env.reset()  # 최신 Gym API에 맞게 변경
+    rAll = 0
+    d = False
+    j = 0
 
+    while j < 99:
+        j += 1
+        state_input = np.eye(num_states)[s:s+1].astype(np.float32)  # 원핫 인코딩
+        
+        # Epsilon-greedy 방식으로 행동 선택
+        Q_values = model(state_input)
+        a = np.argmax(Q_values.numpy())  # 행동 예측
+        if np.random.rand(1) < e:
+            a = env.action_space.sample()  # 랜덤 액션 선택
+        
+        # 환경에서 한 스텝 진행
+        s1, r, d, _, _ = env.step(a)
+
+        # Q-learning 업데이트 수행
+        state_input_next = np.eye(num_states)[s1:s1+1].astype(np.float32)
+        Q1 = model(state_input_next)
+        maxQ1 = np.max(Q1.numpy())
+        
+        targetQ = Q_values.numpy()
+        targetQ[0, a] = r + y * maxQ1
+
+        # 손실 함수 및 최적화 수행
+        with tf.GradientTape() as tape:
+            Q_pred = model(state_input)
+            loss = tf.reduce_sum(tf.square(targetQ - Q_pred))
+        
+        grads = tape.gradient(loss, model.trainable_variables)
+        optimizer.apply_gradients(zip(grads, model.trainable_variables))
+        
+        rAll += r
+        s = s1
+
+        if d:
+            e = 1. / ((i / 50) + 10)  # 탐색 확률 감소
+            break
+
+    jList.append(j)
+    rList.append(rAll)
+
+print("Percent of successful episodes: {:.2f}%".format(100 * sum(rList) / num_episodes))
+
+# 학습 결과 시각화
 plt.plot(rList)
+plt.xlabel('Episode')
+plt.ylabel('Reward')
+plt.title('Reward per Episode')
+plt.show()
