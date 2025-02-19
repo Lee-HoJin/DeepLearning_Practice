@@ -3,11 +3,17 @@ import random
 import torch
 import torch.nn as nn
 import torch.optim as optim
+torch.cuda.init()
 from collections import deque
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import gym
+
+# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = 'cpu'
+print(f"\nUsing {device} device")
+print("GPU: ", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "None")
 
 # 환경 설정
 env = gym.make('CartPole-v0')
@@ -21,8 +27,9 @@ batch_size = 64  # 미니배치 크기
 update_target_freq = 10  # Target DQN 업데이트 주기
 alpha = 0.1  # Q-learning 업데이트 가중치
 tau = 0.005  # Target DQN soft update 비율
-min_buffer_size = 1000  # 최소 Replay Buffer 크기
-epsilon_decay = 0.995  # Epsilon 지수 감소율
+min_buffer_size = 2000  # 최소 Replay Buffer 크기
+epsilon_decay = 0.999  # Epsilon 지수 감소율
+final_epsilon = 0.001  # 학습 후반부에는 거의 greedy 정책 사용
 
 # DQN 신경망 정의
 class DQN(nn.Module):
@@ -41,18 +48,18 @@ class DQN(nn.Module):
         self.loss_fn = nn.MSELoss()
 
     def forward(self, x):
-        x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))
+        x = torch.tanh(self.fc1(x))
+        x = torch.tanh(self.fc2(x))
         return self.fc3(x)
 
     def predict(self, state):
-        state = torch.tensor(state, dtype=torch.float32).unsqueeze(0)
+        state = torch.tensor(state, dtype=torch.float32, device = device).unsqueeze(0)
         with torch.no_grad():
-            return self.forward(state).numpy()
+            return self.forward(state).cpu().numpy()
 
     def update(self, x_stack, y_stack):
-        x_stack = torch.tensor(x_stack, dtype=torch.float32)
-        y_stack = torch.tensor(y_stack, dtype=torch.float32)
+        x_stack = torch.tensor(x_stack, dtype=torch.float32, device = device)
+        y_stack = torch.tensor(y_stack, dtype=torch.float32, device = device)
         self.optimizer.zero_grad()
         loss = self.loss_fn(self.forward(x_stack), y_stack)
         loss.backward()
@@ -86,10 +93,10 @@ def soft_update_target(mainDQN, targetDQN, tau):
 # 학습 루프
 def main():
     max_episodes = 5000
-    replay_buffer = deque(maxlen=REPLAY_MEMORY)
+    replay_buffer = deque(maxlen=REPLAY_MEMORY // 2) # 최신 데이터 중심으로 유지
 
-    mainDQN = DQN(input_size, output_size)
-    targetDQN = DQN(input_size, output_size)
+    mainDQN = DQN(input_size, output_size).to(device)
+    targetDQN = DQN(input_size, output_size).to(device)
     targetDQN.load_state_dict(mainDQN.state_dict())
 
     epsilon = 1.0  # 초기 epsilon 값 설정
@@ -97,7 +104,8 @@ def main():
     steps_list = []  # 각 에피소드에서의 steps를 저장할 리스트
 
     for episode in range(max_episodes):
-        epsilon = max(0.01, epsilon * epsilon_decay)  # Epsilon 지수 감소 적용
+        # epsilon = max(0.01, epsilon * epsilon_decay)  # Epsilon 지수 감소 적용
+        epsilon = max(final_epsilon, epsilon * epsilon_decay)  # epsilon 감소
         done = False
         step_count = 0
 
@@ -112,7 +120,7 @@ def main():
             next_state, reward, done, _ = env.step(action)
 
             if done:
-                reward = -100  # 실패하면 보상 패널티
+                reward = -10  # 실패하면 보상 패널티
 
             replay_buffer.append((state, action, reward, next_state, done))
 
@@ -122,18 +130,23 @@ def main():
                 break
 
         steps_list.append(step_count)  # steps 저장
-        print(f"Episode: {episode} steps: {step_count}")
+        print(f"Episode: {episode + 1} steps: {step_count}")
 
         # 경험이 충분히 쌓일 때까지 학습하지 않음
         if len(replay_buffer) > min_buffer_size and episode % 10 == 1:
-            print(f"Training at episode {episode}...")
-            for i in range(10):
+            # print(f"Training at episode {episode + 1}...")
+            for i in range(20):
                 minibatch = random.sample(replay_buffer, batch_size)
                 loss = simple_replay_train(mainDQN, targetDQN, minibatch)
-                print(f"Batch {i+1}/10 - Loss: {loss:.4f}")
+                # print(f"Batch {i+1}/10 - Loss: {loss:.4f}")
 
+        # # Target 네트워크 Soft Update 적용
+        # soft_update_target(mainDQN, targetDQN, tau)
+        
         # Target 네트워크 Soft Update 적용
-        soft_update_target(mainDQN, targetDQN, tau)
+        if episode % update_target_freq == 0:
+            targetDQN.load_state_dict(mainDQN.state_dict())
+            print("Target network updated!")
 
     # 학습 종료 후 그래프 그리기
     plt.figure(figsize=(10, 5))
