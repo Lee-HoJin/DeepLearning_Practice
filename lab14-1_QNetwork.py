@@ -8,79 +8,79 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+# TensorFlow 2.x에서 1.x 스타일의 그래프 실행을 위해 Eager Execution 비활성화
+tf.compat.v1.disable_eager_execution()
+
 # Gym 환경 초기화
-env = gym.make('FrozenLake-v1', is_slippery=False)  # v0 -> v1로 변경됨
-num_states = env.observation_space.n
-num_actions = env.action_space.n
+env = gym.make('FrozenLake-v0')
 
 # 신경망 모델 정의
-class QNetwork(tf.keras.Model):
-    def __init__(self, num_states, num_actions):
-        super(QNetwork, self).__init__()
-        self.dense = tf.keras.layers.Dense(num_actions, activation=None,
-                                           kernel_initializer=tf.keras.initializers.RandomUniform(0, 0.01))
+inputs1 = tf.compat.v1.placeholder(shape=[1,16], dtype=tf.float32)
+W = tf.Variable(tf.random.uniform([16,4], 0, 0.01))
+Qout = tf.matmul(inputs1, W)
+predict = tf.argmax(Qout, 1)
 
-    def call(self, state):
-        return self.dense(state)
+# 손실 함수 및 최적화 설정
+nextQ = tf.compat.v1.placeholder(shape=[1,4], dtype=tf.float32)
+loss = tf.reduce_sum(tf.square(nextQ - Qout))
+trainer = tf.compat.v1.train.GradientDescentOptimizer(learning_rate=0.1)
+updateModel = trainer.minimize(loss)
 
-# 모델 및 최적화 함수 설정
-model = QNetwork(num_states, num_actions)
-optimizer = tf.keras.optimizers.SGD(learning_rate=0.1)
+# 초기화 연산 정의
+init = tf.compat.v1.global_variables_initializer()
 
 # 학습 파라미터 설정
 y = 0.99  # 할인율
 e = 0.1  # 탐색 확률
-num_episodes = 2000  # 에피소드 수
+num_episodes = 2000  # 학습할 에피소드 수
 
 # 보상 및 단계 기록용 리스트
 jList = []
 rList = []
 
-# 학습 루프
-for i in range(num_episodes):
-    s, _ = env.reset()  # 최신 Gym API에 맞게 변경
-    rAll = 0
-    d = False
-    j = 0
+# TensorFlow 1.x 스타일의 세션 실행
+with tf.compat.v1.Session() as sess:
+    sess.run(init)
 
-    while j < 99:
-        j += 1
-        state_input = np.eye(num_states)[s:s+1].astype(np.float32)  # 원핫 인코딩
-        
-        # Epsilon-greedy 방식으로 행동 선택
-        Q_values = model(state_input)
-        a = np.argmax(Q_values.numpy())  # 행동 예측
-        if np.random.rand(1) < e:
-            a = env.action_space.sample()  # 랜덤 액션 선택
-        
-        # 환경에서 한 스텝 진행
-        s1, r, d, _, _ = env.step(a)
+    for i in range(num_episodes):
+        s = env.reset()  # Gym 0.15.4에서는 단일 값 반환
+        rAll = 0
+        d = False
+        j = 0
 
-        # Q-learning 업데이트 수행
-        state_input_next = np.eye(num_states)[s1:s1+1].astype(np.float32)
-        Q1 = model(state_input_next)
-        maxQ1 = np.max(Q1.numpy())
-        
-        targetQ = Q_values.numpy()
-        targetQ[0, a] = r + y * maxQ1
+        while j < 99:
+            j += 1
+            # 현재 상태의 원핫 인코딩 벡터 생성
+            state_input = np.identity(16)[s:s+1]
 
-        # 손실 함수 및 최적화 수행
-        with tf.GradientTape() as tape:
-            Q_pred = model(state_input)
-            loss = tf.reduce_sum(tf.square(targetQ - Q_pred))
-        
-        grads = tape.gradient(loss, model.trainable_variables)
-        optimizer.apply_gradients(zip(grads, model.trainable_variables))
-        
-        rAll += r
-        s = s1
+            # Q-network로 행동 예측
+            a, allQ = sess.run([predict, Qout], feed_dict={inputs1: state_input})
 
-        if d:
-            e = 1. / ((i / 50) + 10)  # 탐색 확률 감소
-            break
+            # Epsilon-greedy 정책 적용
+            if np.random.rand(1) < e:
+                a[0] = env.action_space.sample()
 
-    jList.append(j)
-    rList.append(rAll)
+            # 환경에서 한 스텝 진행
+            s1, r, d, _ = env.step(a[0])
+
+            # Q-learning 업데이트 수행
+            Q1 = sess.run(Qout, feed_dict={inputs1: np.identity(16)[s1:s1+1]})
+            maxQ1 = np.max(Q1)
+            targetQ = allQ
+            targetQ[0, a[0]] = r + y * maxQ1
+
+            # 모델 학습
+            _, W1 = sess.run([updateModel, W], feed_dict={inputs1: state_input, nextQ: targetQ})
+
+            rAll += r
+            s = s1
+
+            if d:
+                e = 1./((i/50) + 10)  # 탐색 확률 감소
+                break
+
+        jList.append(j)
+        rList.append(rAll)
 
 print("Percent of successful episodes: {:.2f}%".format(100 * sum(rList) / num_episodes))
 
