@@ -27,7 +27,7 @@ batch_size = 64  # 미니배치 크기
 update_target_freq = 10  # Target DQN 업데이트 주기
 alpha = 0.1  # Q-learning 업데이트 가중치
 # tau = 0.005  # Target DQN soft update 비율
-tau = 0.9  # Target DQN soft update 비율
+tau = 1  # Target DQN soft update 비율
 min_buffer_size = 2000  # 최소 Replay Buffer 크기
 epsilon_decay = 0.999  # Epsilon 지수 감소율
 final_epsilon = 0.001  # 학습 후반부에는 거의 greedy 정책 사용
@@ -93,11 +93,14 @@ def soft_update_target(mainDQN, targetDQN, tau):
 
 # 학습 루프
 def main():
-    max_episodes = 5000
+    max_episodes = 2000
     replay_buffer = deque(maxlen=REPLAY_MEMORY // 2) # 최신 데이터 중심으로 유지
 
-    mainDQN = DQN(input_size, output_size).to(device)
-    targetDQN = DQN(input_size, output_size).to(device)
+    hidden_size = 64
+    learning_rate = 1e-2
+
+    mainDQN = DQN(input_size, output_size, h_size = hidden_size, lr = learning_rate).to(device)
+    targetDQN = DQN(input_size, output_size, h_size = hidden_size, lr = learning_rate).to(device)
     targetDQN.load_state_dict(mainDQN.state_dict())
 
     epsilon = 1.0  # 초기 epsilon 값 설정
