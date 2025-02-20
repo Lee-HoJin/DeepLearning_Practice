@@ -140,13 +140,13 @@ def main():
                 loss = simple_replay_train(mainDQN, targetDQN, minibatch)
                 # print(f"Batch {i+1}/10 - Loss: {loss:.4f}")
 
-        # # Target 네트워크 Soft Update 적용
-        # soft_update_target(mainDQN, targetDQN, tau)
-        
         # Target 네트워크 Soft Update 적용
-        if episode % update_target_freq == 0:
-            targetDQN.load_state_dict(mainDQN.state_dict())
-            print("Target network updated!")
+        soft_update_target(mainDQN, targetDQN, tau)
+        
+        # # Target 네트워크 Soft Update 적용
+        # if episode % update_target_freq == 0:
+        #     targetDQN.load_state_dict(mainDQN.state_dict())
+        #     print("Target network updated!")
 
     # 학습 종료 후 그래프 그리기
     plt.figure(figsize=(10, 5))
