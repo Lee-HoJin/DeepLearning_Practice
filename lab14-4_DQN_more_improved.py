@@ -33,7 +33,7 @@ input_size = env.observation_space.shape[0]  # CartPole 상태 (4)
 output_size = env.action_space.n             # 행동 (2)
 dis = 0.99                                   # 할인율
 REPLAY_MEMORY = 30000
-batch_size = 64                              # 미니배치 크기
+batch_size = 128                             # 미니배치 크기
 alpha = 0.2                                  # Q-learning 업데이트 가중치
 #tau = 0.005                                 # Target DQN soft update 비율
 tau = 1                                      # Target DQN soft update 비율
@@ -42,7 +42,7 @@ epsilon_decay = 0.999                        # Epsilon 지수 감소율
 final_epsilon = 0.001                        # 학습 후반부에는 거의 greedy 정책 사용
 
 learning_rate = 1e-2
-hidden_size = 64
+hidden_size = 512
 
 # DQN 신경망 정의
 class DQN(nn.Module):
@@ -50,20 +50,23 @@ class DQN(nn.Module):
         super(DQN, self).__init__()
         self.fc1 = nn.Linear(input_size, h_size)
         self.fc2 = nn.Linear(h_size, h_size)
-        self.fc3 = nn.Linear(h_size, output_size)
+        self.fc3 = nn.Linear(h_size, h_size)
+        self.fc4 = nn.Linear(h_size, output_size)
 
         # 가중치 초기화
         nn.init.xavier_uniform_(self.fc1.weight)
         nn.init.xavier_uniform_(self.fc2.weight)
         nn.init.xavier_uniform_(self.fc3.weight)
+        nn.init.xavier_uniform_(self.fc4.weight)
 
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
         self.loss_fn = nn.MSELoss()
 
     def forward(self, x):
-        x = torch.tanh(self.fc1(x))
+        x = torch.tanh(self.fc1(x)) 
         x = torch.tanh(self.fc2(x))
-        return self.fc3(x)
+        x = torch.tanh(self.fc3(x))
+        return self.fc4(x)
 
     def predict(self, state):
         state = torch.tensor(state, dtype=torch.float32, device = device).unsqueeze(0)
@@ -82,7 +85,7 @@ class DQN(nn.Module):
 # 경험 재사용 학습
 def simple_replay_train(mainDQN, targetDQN, train_batch):
     x_stack = np.empty((0, mainDQN.fc1.in_features))   # 입력 (state)
-    y_stack = np.empty((0, mainDQN.fc3.out_features))  # 정답 Q값 (target Q-values)
+    y_stack = np.empty((0, mainDQN.fc4.out_features))  # 정답 Q값 (target Q-values)
 
     for state, action, reward, next_state, done in train_batch:  # 경험 샘플(batch) 가져오기
         Q = mainDQN.predict(state)  # 현재 상태 s에서의 Q값 예측
@@ -116,7 +119,7 @@ def main():
     steps_list = []  # 각 에피소드에서의 steps를 저장할 리스트
     
     FLAG = False
-
+    
     for episode in range(max_episodes):
         # epsilon = max(0.01, epsilon * epsilon_decay)  # Epsilon 지수 감소 적용
         epsilon = max(final_epsilon, epsilon * epsilon_decay)  # epsilon 감소
@@ -126,7 +129,7 @@ def main():
         state = env.reset()
 
         while not done:
-            if np.random.rand(1) < epsilon and not FLAG:
+            if np.random.rand(1) < epsilon :
                 action = env.action_space.sample()
             else:
                 action = np.argmax(mainDQN.predict(state))
@@ -141,19 +144,18 @@ def main():
             state = next_state
             step_count += 1
             if step_count > 10000:
-                FLAG = True
                 break
 
         steps_list.append(step_count)  # steps 저장
         print(f"Episode: {episode + 1} steps: {step_count}")
 
         # 경험이 충분히 쌓일 때까지 학습하지 않음
-        if len(replay_buffer) > min_buffer_size and episode % 10 == 1:
+        if len(replay_buffer) > min_buffer_size and episode % 20 == 1 :
             # print(f"Training at episode {episode + 1}...")
-            for i in range(10):
+            for i in range(40):
                 minibatch = random.sample(replay_buffer, batch_size)
                 loss = simple_replay_train(mainDQN, targetDQN, minibatch)
-                print(f"Batch {i+1}/10 - Loss: {loss:.4f}")
+                print(f"Batch {i+1}/40 - Loss: {loss:.8f}")
 
             soft_update_target(mainDQN, targetDQN, tau)
 
