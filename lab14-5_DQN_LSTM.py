@@ -3,7 +3,6 @@ import random
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.autograd import Variable
 from collections import deque
 import matplotlib
 matplotlib.use("Agg")
@@ -19,7 +18,6 @@ register(
     reward_threshold=10000.0,
 )
 
-# device = 'cuda'
 device = 'cpu'
 print(f"\nUsing {device} device")
 print("GPU: ", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "None")
@@ -31,8 +29,8 @@ env = gym.make('CartPole-v2')
 input_size = env.observation_space.shape[0]  # 상태 차원 (4)
 num_classes = env.action_space.n             # 행동 개수 (2)
 dis = 0.99                                   # 할인율
-REPLAY_MEMORY = 50000
-batch_size = 16                              # 미니배치 크기
+REPLAY_MEMORY = 30000
+batch_size = 64                              # 미니배치 크기
 alpha = 0.1                                  # Q-learning 업데이트 가중치
 tau = 0.8                                    # Target 네트워크 Soft Update 비율
 min_buffer_size = 2000                       # 최소 Replay Buffer 크기
@@ -40,16 +38,15 @@ epsilon_decay = 0.999                        # Epsilon 지수 감소율
 final_epsilon = 0.001                        # 학습 후반부에는 거의 greedy 정책 사용
 
 # RNN/LSTM 관련 파라미터
-num_layers = 5
-hidden_size = 16
-# seq_length는 이후 시퀀스 입력으로 사용할 경우 필요 (현재는 1로 사용)
-seq_length = 100
+num_layers = 2
+hidden_size = 64
+seq_length = 10   # 시퀀스 길이를 4로 설정 (원하는 값으로 변경 가능)
 
-# 전역 학습률 (일관되게 관리하거나, 클래스 인자로 넘기도록 수정할 수 있음)
+# 전역 학습률
 learning_rate = 1e-2
 
 class LSTM(nn.Module):
-    def __init__(self, num_classes, input_size, hidden_size, num_layers, seq_length=1, learning_rate=1e-2):
+    def __init__(self, num_classes, input_size, hidden_size, num_layers, seq_length, learning_rate=1e-2):
         super(LSTM, self).__init__()
         self.num_classes = num_classes
         self.num_layers = num_layers
@@ -74,19 +71,18 @@ class LSTM(nn.Module):
         out = self.fc(h_out)  # shape: [batch, num_classes]
         return out
     
-    def predict(self, state):
-        # state: numpy array shape (input_size,)
-        state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0).unsqueeze(0)
+    def predict(self, state_seq):
+        # state_seq: numpy array shape (seq_length, input_size)
+        # 배치 차원을 추가하여 (1, seq_length, input_size)로 변환
+        state_seq = torch.tensor(state_seq, dtype=torch.float32, device=device).unsqueeze(0)
         with torch.no_grad():
-            return self.forward(state).cpu().numpy()
+            return self.forward(state_seq).cpu().numpy()
 
     def update(self, x_stack, y_stack):
-        # x_stack: numpy array shape (batch, input_size)
+        # x_stack: numpy array shape (batch, seq_length, input_size)
         # y_stack: numpy array shape (batch, num_classes)
         x_stack = torch.tensor(x_stack, dtype=torch.float32, device=device)
         y_stack = torch.tensor(y_stack, dtype=torch.float32, device=device)
-        # LSTM 입력은 3D: (batch, seq_length, input_size)
-        x_stack = x_stack.unsqueeze(1)  # (batch, 1, input_size)
         
         self.optimizer.zero_grad()
         loss = self.loss_fn(self.forward(x_stack), y_stack)
@@ -101,21 +97,21 @@ def init_weights(m):
             nn.init.zeros_(m.bias)
 
 def simple_replay_train(mainLSTM, targetLSTM, train_batch):
-    # mainLSTM.lstm.input_size를 사용하여 올바른 차원을 설정
-    x_stack = np.empty((0, mainLSTM.input_size))
+    # x_stack: (batch, seq_length, input_size), y_stack: (batch, num_classes)
+    x_stack = np.empty((0, mainLSTM.seq_length, mainLSTM.input_size))
     y_stack = np.empty((0, mainLSTM.fc.out_features))
 
-    for state, action, reward, next_state, done in train_batch:
-        Q = mainLSTM.predict(state)
+    for state_seq, action, reward, next_state_seq, done in train_batch:
+        Q = mainLSTM.predict(state_seq)
 
         if done:
             Q[0, action] = reward
         else:
-            maxQ1 = np.max(targetLSTM.predict(next_state))
+            maxQ1 = np.max(targetLSTM.predict(next_state_seq))
             Q[0, action] = (1 - alpha) * Q[0, action] + alpha * (reward + dis * maxQ1)
 
-        # state는 (input_size,) 형태임
-        x_stack = np.vstack([x_stack, state])
+        # state_seq는 이미 (seq_length, input_size) shape이므로 새로운 축을 추가해 (1, seq_length, input_size)로 맞춤
+        x_stack = np.vstack([x_stack, state_seq[np.newaxis, ...]])
         y_stack = np.vstack([y_stack, Q])
 
     return mainLSTM.update(x_stack, y_stack)
@@ -128,7 +124,6 @@ def main():
     max_episodes = 5000
     replay_buffer = deque(maxlen=REPLAY_MEMORY // 2)  # 최신 데이터 중심 유지
 
-    # LSTM 생성 시 명시적으로 학습률과 seq_length를 전달
     mainLSTM = LSTM(num_classes, input_size, hidden_size, num_layers, seq_length, learning_rate).to(device)
     mainLSTM.apply(init_weights)
     targetLSTM = LSTM(num_classes, input_size, hidden_size, num_layers, seq_length, learning_rate).to(device)
@@ -144,20 +139,29 @@ def main():
         step_count = 0
 
         state = env.reset()
+        # 초기 상태 시퀀스: 첫 상태를 seq_length번 반복하여 채움
+        state_seq = deque([state] * seq_length, maxlen=seq_length)
 
         while not done:
+            current_state_seq = np.array(state_seq)
             if np.random.rand() < epsilon:
                 action = env.action_space.sample()
             else:
-                action = np.argmax(mainLSTM.predict(state))
+                action = np.argmax(mainLSTM.predict(current_state_seq))
 
             next_state, reward, done, _ = env.step(action)
-
             if done:
-                reward = -1
+                reward = 0.1
 
-            replay_buffer.append((state, action, reward, next_state, done))
-            state = next_state
+            # 다음 상태 시퀀스 생성: 기존 시퀀스에 next_state 추가 (가장 오래된 상태는 제거됨)
+            next_state_seq = state_seq.copy()
+            next_state_seq.append(next_state)
+            next_state_seq = np.array(next_state_seq)
+
+            replay_buffer.append((current_state_seq, action, reward, next_state_seq, done))
+            
+            # 현재 시퀀스 업데이트
+            state_seq.append(next_state)
             step_count += 1
             if step_count > 10000:
                 break
@@ -166,11 +170,11 @@ def main():
         print(f"Episode: {episode + 1} steps: {step_count}")
 
         if len(replay_buffer) > min_buffer_size and episode % 10 == 1:
-            for i in range(10):
+            for _ in range(10):
                 minibatch = random.sample(replay_buffer, batch_size)
                 loss = simple_replay_train(mainLSTM, targetLSTM, minibatch)
-
-        soft_update_target(mainLSTM, targetLSTM, tau)
+                
+            soft_update_target(mainLSTM, targetLSTM, tau)
 
     plt.figure(figsize=(10, 5))
     plt.plot(steps_list, label='Steps per Episode')

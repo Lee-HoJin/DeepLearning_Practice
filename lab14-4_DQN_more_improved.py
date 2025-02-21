@@ -31,8 +31,8 @@ env = gym.make('CartPole-v2')
 input_size = env.observation_space.shape[0]  # CartPole 상태 (4)
 output_size = env.action_space.n  # 행동 (2)
 dis = 0.99  # 할인율
-REPLAY_MEMORY = 50000
-batch_size = 16  # 미니배치 크기
+REPLAY_MEMORY = 30000
+batch_size = 64  # 미니배치 크기
 update_target_freq = 10  # Target DQN 업데이트 주기
 alpha = 0.2  # Q-learning 업데이트 가중치
 tau = 0.005  # Target DQN soft update 비율
@@ -78,22 +78,22 @@ class DQN(nn.Module):
 
 # 경험 재사용 학습
 def simple_replay_train(mainDQN, targetDQN, train_batch):
-    x_stack = np.empty((0, mainDQN.fc1.in_features))
-    y_stack = np.empty((0, mainDQN.fc3.out_features))
+    x_stack = np.empty((0, mainDQN.fc1.in_features))   # 입력 (state)
+    y_stack = np.empty((0, mainDQN.fc3.out_features))  # 정답 Q값 (target Q-values)
 
-    for state, action, reward, next_state, done in train_batch:
-        Q = mainDQN.predict(state)
+    for state, action, reward, next_state, done in train_batch:  # 경험 샘플(batch) 가져오기
+        Q = mainDQN.predict(state)  # 현재 상태 s에서의 Q값 예측
 
         if done:
-            Q[0, action] = reward
+            Q[0, action] = reward  # 게임이 끝났으면 보상만 반영
         else:
-            maxQ1 = np.max(targetDQN.predict(next_state))
+            maxQ1 = np.max(targetDQN.predict(next_state))  # 다음 상태 s'에서의 최대 Q값
             Q[0, action] = (1 - alpha) * Q[0, action] + alpha * (reward + dis * maxQ1)  # Soft update 적용
 
-        x_stack = np.vstack([x_stack, state])
-        y_stack = np.vstack([y_stack, Q])
+        x_stack = np.vstack([x_stack, state])  # 입력 데이터 (state) 저장
+        y_stack = np.vstack([y_stack, Q])      # 업데이트된 Q값 저장
 
-    return mainDQN.update(x_stack, y_stack)
+    return mainDQN.update(x_stack, y_stack)  # 신경망 학습
 
 # Target 네트워크 Soft Update
 def soft_update_target(mainDQN, targetDQN, tau):
@@ -133,7 +133,7 @@ def main():
             next_state, reward, done, _ = env.step(action)
 
             if done:
-                reward = -1  # 실패하면 보상 패널티
+                reward = -1
 
             replay_buffer.append((state, action, reward, next_state, done))
 
@@ -153,13 +153,13 @@ def main():
                 loss = simple_replay_train(mainDQN, targetDQN, minibatch)
                 print(f"Batch {i+1}/10 - Loss: {loss:.4f}")
 
-        # Target 네트워크 Soft Update 적용
-        soft_update_target(mainDQN, targetDQN, tau)
+        ## Target 네트워크 Soft Update 적용
+        # soft_update_target(mainDQN, targetDQN, tau)
         
-        # # Target 네트워크 Soft Update 적용
-        # if episode % update_target_freq == 0:
-        #     targetDQN.load_state_dict(mainDQN.state_dict())
-        #     print("Target network updated!")
+        # Target 네트워크 Soft Update 적용
+        if episode % update_target_freq == 0:
+            targetDQN.load_state_dict(mainDQN.state_dict())
+            print("Target network updated!")
 
     # 학습 종료 후 그래프 그리기
     plt.figure(figsize=(10, 5))
