@@ -28,18 +28,21 @@ print("GPU: ", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "
 env = gym.make('CartPole-v2')
 
 # 하이퍼파라미터 설정
+max_episodes = 4000
 input_size = env.observation_space.shape[0]  # CartPole 상태 (4)
-output_size = env.action_space.n  # 행동 (2)
-dis = 0.99  # 할인율
+output_size = env.action_space.n             # 행동 (2)
+dis = 0.99                                   # 할인율
 REPLAY_MEMORY = 30000
-batch_size = 64  # 미니배치 크기
-update_target_freq = 10  # Target DQN 업데이트 주기
-alpha = 0.2  # Q-learning 업데이트 가중치
-tau = 0.005  # Target DQN soft update 비율
-#tau = .5  # Target DQN soft update 비율
-min_buffer_size = 5000  # 최소 Replay Buffer 크기
-epsilon_decay = 0.999  # Epsilon 지수 감소율
-final_epsilon = 0.001  # 학습 후반부에는 거의 greedy 정책 사용
+batch_size = 64                              # 미니배치 크기
+alpha = 0.2                                  # Q-learning 업데이트 가중치
+#tau = 0.005                                 # Target DQN soft update 비율
+tau = 1                                      # Target DQN soft update 비율
+min_buffer_size = 5000                       # 최소 Replay Buffer 크기
+epsilon_decay = 0.999                        # Epsilon 지수 감소율
+final_epsilon = 0.001                        # 학습 후반부에는 거의 greedy 정책 사용
+
+learning_rate = 1e-2
+hidden_size = 64
 
 # DQN 신경망 정의
 class DQN(nn.Module):
@@ -102,11 +105,7 @@ def soft_update_target(mainDQN, targetDQN, tau):
 
 # 학습 루프
 def main():
-    max_episodes = 5000
     replay_buffer = deque(maxlen=REPLAY_MEMORY // 2) # 최신 데이터 중심으로 유지
-
-    hidden_size = 64
-    learning_rate = 1e-2
 
     mainDQN = DQN(input_size, output_size, h_size = hidden_size, lr = learning_rate).to(device)
     targetDQN = DQN(input_size, output_size, h_size = hidden_size, lr = learning_rate).to(device)
@@ -115,6 +114,8 @@ def main():
     epsilon = 1.0  # 초기 epsilon 값 설정
 
     steps_list = []  # 각 에피소드에서의 steps를 저장할 리스트
+    
+    FLAG = False
 
     for episode in range(max_episodes):
         # epsilon = max(0.01, epsilon * epsilon_decay)  # Epsilon 지수 감소 적용
@@ -125,7 +126,7 @@ def main():
         state = env.reset()
 
         while not done:
-            if np.random.rand(1) < epsilon:
+            if np.random.rand(1) < epsilon and not FLAG:
                 action = env.action_space.sample()
             else:
                 action = np.argmax(mainDQN.predict(state))
@@ -140,6 +141,7 @@ def main():
             state = next_state
             step_count += 1
             if step_count > 10000:
+                FLAG = True
                 break
 
         steps_list.append(step_count)  # steps 저장
@@ -153,23 +155,17 @@ def main():
                 loss = simple_replay_train(mainDQN, targetDQN, minibatch)
                 print(f"Batch {i+1}/10 - Loss: {loss:.4f}")
 
-        ## Target 네트워크 Soft Update 적용
-        # soft_update_target(mainDQN, targetDQN, tau)
-        
-        # Target 네트워크 Soft Update 적용
-        if episode % update_target_freq == 0:
-            targetDQN.load_state_dict(mainDQN.state_dict())
-            print("Target network updated!")
+            soft_update_target(mainDQN, targetDQN, tau)
 
     # 학습 종료 후 그래프 그리기
-    plt.figure(figsize=(10, 5))
+    plt.figure(figsize=(10, 5), dpi=150)
     plt.plot(steps_list, label='Steps per Episode')
     plt.xlabel('Episode')
     plt.ylabel('Steps')
-    plt.title('Steps per Episode Over Training')
+    plt.title('Steps per Episode Over Training(DQN)')
     plt.legend()
     # plt.show()
-    plt.savefig("Steps_plotted.png")
+    plt.savefig("Steps_plotted_DQN.png")
 
 if __name__ == "__main__":
     main()
