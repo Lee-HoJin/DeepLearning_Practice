@@ -9,31 +9,41 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import gym
+from gym.envs.registration import register
 
+# Register CartPole with user-defined max_episode_steps
+register(
+    id='CartPole-v2',
+    entry_point='gym.envs.classic_control:CartPoleEnv',
+    tags={'wrapper_config.TimeLimit.max_episode_steps': 10000},
+    reward_threshold=10000.0,
+)
+
+# device = 'cuda'
 device = 'cpu'
 print(f"\nUsing {device} device")
 print("GPU: ", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "None")
 
 # 환경 설정
-env = gym.make('CartPole-v0')
+env = gym.make('CartPole-v2')
 
 # 하이퍼파라미터 설정
 input_size = env.observation_space.shape[0]  # 상태 차원 (4)
 num_classes = env.action_space.n             # 행동 개수 (2)
 dis = 0.99                                   # 할인율
 REPLAY_MEMORY = 50000
-batch_size = 64                            # 미니배치 크기
-alpha = 0.1                                # Q-learning 업데이트 가중치
-tau = 0.9                                  # Target 네트워크 Soft Update 비율
-min_buffer_size = 2000                     # 최소 Replay Buffer 크기
-epsilon_decay = 0.999                      # Epsilon 지수 감소율
-final_epsilon = 0.001                      # 학습 후반부에는 거의 greedy 정책 사용
+batch_size = 16                              # 미니배치 크기
+alpha = 0.1                                  # Q-learning 업데이트 가중치
+tau = 0.8                                    # Target 네트워크 Soft Update 비율
+min_buffer_size = 2000                       # 최소 Replay Buffer 크기
+epsilon_decay = 0.999                        # Epsilon 지수 감소율
+final_epsilon = 0.001                        # 학습 후반부에는 거의 greedy 정책 사용
 
 # RNN/LSTM 관련 파라미터
-num_layers = 2
-hidden_size = 64
+num_layers = 5
+hidden_size = 16
 # seq_length는 이후 시퀀스 입력으로 사용할 경우 필요 (현재는 1로 사용)
-seq_length = 1
+seq_length = 100
 
 # 전역 학습률 (일관되게 관리하거나, 클래스 인자로 넘기도록 수정할 수 있음)
 learning_rate = 1e-2
@@ -144,7 +154,7 @@ def main():
             next_state, reward, done, _ = env.step(action)
 
             if done:
-                reward = -10
+                reward = -1
 
             replay_buffer.append((state, action, reward, next_state, done))
             state = next_state
@@ -156,7 +166,7 @@ def main():
         print(f"Episode: {episode + 1} steps: {step_count}")
 
         if len(replay_buffer) > min_buffer_size and episode % 10 == 1:
-            for i in range(20):
+            for i in range(10):
                 minibatch = random.sample(replay_buffer, batch_size)
                 loss = simple_replay_train(mainLSTM, targetLSTM, minibatch)
 
@@ -168,7 +178,7 @@ def main():
     plt.ylabel('Steps')
     plt.title('Steps per Episode Over Training')
     plt.legend()
-    plt.savefig("Steps_plotted.png")
+    plt.savefig("Steps_plotted_LSTM.png")
 
 if __name__ == "__main__":
     main()

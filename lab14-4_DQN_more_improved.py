@@ -9,6 +9,15 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import gym
+from gym.envs.registration import register
+
+# Register CartPole with user-defined max_episode_steps
+register(
+    id='CartPole-v2',
+    entry_point='gym.envs.classic_control:CartPoleEnv',
+    tags={'wrapper_config.TimeLimit.max_episode_steps': 10000},
+    reward_threshold=10000.0,
+)
 
 # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 device = 'cpu'
@@ -16,19 +25,19 @@ print(f"\nUsing {device} device")
 print("GPU: ", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "None")
 
 # 환경 설정
-env = gym.make('CartPole-v0')
+env = gym.make('CartPole-v2')
 
 # 하이퍼파라미터 설정
 input_size = env.observation_space.shape[0]  # CartPole 상태 (4)
 output_size = env.action_space.n  # 행동 (2)
 dis = 0.99  # 할인율
 REPLAY_MEMORY = 50000
-batch_size = 64  # 미니배치 크기
+batch_size = 16  # 미니배치 크기
 update_target_freq = 10  # Target DQN 업데이트 주기
-alpha = 0.1  # Q-learning 업데이트 가중치
-# tau = 0.005  # Target DQN soft update 비율
-tau = 1  # Target DQN soft update 비율
-min_buffer_size = 2000  # 최소 Replay Buffer 크기
+alpha = 0.2  # Q-learning 업데이트 가중치
+tau = 0.005  # Target DQN soft update 비율
+#tau = .5  # Target DQN soft update 비율
+min_buffer_size = 5000  # 최소 Replay Buffer 크기
 epsilon_decay = 0.999  # Epsilon 지수 감소율
 final_epsilon = 0.001  # 학습 후반부에는 거의 greedy 정책 사용
 
@@ -93,7 +102,7 @@ def soft_update_target(mainDQN, targetDQN, tau):
 
 # 학습 루프
 def main():
-    max_episodes = 2000
+    max_episodes = 5000
     replay_buffer = deque(maxlen=REPLAY_MEMORY // 2) # 최신 데이터 중심으로 유지
 
     hidden_size = 64
@@ -124,7 +133,7 @@ def main():
             next_state, reward, done, _ = env.step(action)
 
             if done:
-                reward = -10  # 실패하면 보상 패널티
+                reward = -1  # 실패하면 보상 패널티
 
             replay_buffer.append((state, action, reward, next_state, done))
 
@@ -139,10 +148,10 @@ def main():
         # 경험이 충분히 쌓일 때까지 학습하지 않음
         if len(replay_buffer) > min_buffer_size and episode % 10 == 1:
             # print(f"Training at episode {episode + 1}...")
-            for i in range(20):
+            for i in range(10):
                 minibatch = random.sample(replay_buffer, batch_size)
                 loss = simple_replay_train(mainDQN, targetDQN, minibatch)
-                # print(f"Batch {i+1}/10 - Loss: {loss:.4f}")
+                print(f"Batch {i+1}/10 - Loss: {loss:.4f}")
 
         # Target 네트워크 Soft Update 적용
         soft_update_target(mainDQN, targetDQN, tau)
