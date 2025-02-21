@@ -41,8 +41,8 @@ min_buffer_size = 5000                       # 최소 Replay Buffer 크기
 epsilon_decay = 0.999                        # Epsilon 지수 감소율
 final_epsilon = 0.001                        # 학습 후반부에는 거의 greedy 정책 사용
 
-learning_rate = 1e-2
-hidden_size = 512
+learning_rate = 1e-3
+hidden_size = 128
 
 # DQN 신경망 정의
 class DQN(nn.Module):
@@ -117,6 +117,7 @@ def main():
     epsilon = 1.0  # 초기 epsilon 값 설정
 
     steps_list = []  # 각 에피소드에서의 steps를 저장할 리스트
+    loss_list = []
     
     FLAG = False
     
@@ -156,6 +157,9 @@ def main():
                 minibatch = random.sample(replay_buffer, batch_size)
                 loss = simple_replay_train(mainDQN, targetDQN, minibatch)
                 print(f"Batch {i+1}/40 - Loss: {loss:.8f}")
+                
+                if episode > 2000: 
+                    loss_list.append(loss)
 
             soft_update_target(mainDQN, targetDQN, tau)
 
@@ -168,6 +172,16 @@ def main():
     plt.legend()
     # plt.show()
     plt.savefig("Steps_plotted_DQN.png")
+    plt.close()
+    
+    plt.figure(figsize=(10, 5), dpi=150)
+    plt.plot(loss_list, label='Loss Trend')
+    plt.xlabel('Iterations')
+    plt.ylabel('Loss')
+    plt.title('Loss Trends Over Training(DQN)')
+    plt.legend()
+    # plt.show()
+    plt.savefig("Loss_plotted_DQN.png")
 
 if __name__ == "__main__":
     main()
