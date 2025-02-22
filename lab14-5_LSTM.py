@@ -35,7 +35,7 @@ REPLAY_MEMORY = 80000
 batch_size = 128                              # 미니배치 크기
 alpha = 0.1                                  # Q-learning 업데이트 가중치
 tau = 1                                      # Target 네트워크 Soft Update 비율
-min_buffer_size = 5000                       # 최소 Replay Buffer 크기
+min_buffer_size = 8000                       # 최소 Replay Buffer 크기
 epsilon_decay = 0.999                        # Epsilon 지수 감소율
 final_epsilon = 0.001                        # 학습 후반부에는 거의 greedy 정책 사용
 
@@ -144,6 +144,10 @@ def main():
         state = env.reset()
         # 초기 상태 시퀀스: 첫 상태를 seq_length번 반복하여 채움
         state_seq = deque([state] * seq_length, maxlen=seq_length)
+
+        if episode < 50 :
+            print(state_seq)
+            print("_")
 
         while not done:
             current_state_seq = np.array(state_seq)
