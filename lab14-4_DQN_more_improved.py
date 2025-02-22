@@ -32,17 +32,16 @@ max_episodes = 4000
 input_size = env.observation_space.shape[0]  # CartPole 상태 (4)
 output_size = env.action_space.n             # 행동 (2)
 dis = 0.99                                   # 할인율
-REPLAY_MEMORY = 30000
-batch_size = 128                             # 미니배치 크기
+REPLAY_MEMORY = 80000
+batch_size = 256                             # 미니배치 크기
 alpha = 0.2                                  # Q-learning 업데이트 가중치
-#tau = 0.005                                 # Target DQN soft update 비율
 tau = 1                                      # Target DQN soft update 비율
-min_buffer_size = 5000                       # 최소 Replay Buffer 크기
+min_buffer_size = 1000                       # 최소 Replay Buffer 크기
 epsilon_decay = 0.999                        # Epsilon 지수 감소율
 final_epsilon = 0.001                        # 학습 후반부에는 거의 greedy 정책 사용
 
-learning_rate = 1e-3
-hidden_size = 128
+learning_rate = 1e-2
+hidden_size = 32
 
 # DQN 신경망 정의
 class DQN(nn.Module):
@@ -63,9 +62,9 @@ class DQN(nn.Module):
         self.loss_fn = nn.MSELoss()
 
     def forward(self, x):
-        x = torch.tanh(self.fc1(x)) 
-        x = torch.tanh(self.fc2(x))
-        x = torch.tanh(self.fc3(x))
+        x = torch.relu(self.fc1(x)) 
+        x = torch.relu(self.fc2(x))
+        x = torch.relu(self.fc3(x))
         return self.fc4(x)
 
     def predict(self, state):
@@ -119,8 +118,6 @@ def main():
     steps_list = []  # 각 에피소드에서의 steps를 저장할 리스트
     loss_list = []
     
-    FLAG = False
-    
     for episode in range(max_episodes):
         # epsilon = max(0.01, epsilon * epsilon_decay)  # Epsilon 지수 감소 적용
         epsilon = max(final_epsilon, epsilon * epsilon_decay)  # epsilon 감소
@@ -138,7 +135,7 @@ def main():
             next_state, reward, done, _ = env.step(action)
 
             if done:
-                reward = -1
+                reward = -10
 
             replay_buffer.append((state, action, reward, next_state, done))
 
@@ -153,10 +150,10 @@ def main():
         # 경험이 충분히 쌓일 때까지 학습하지 않음
         if len(replay_buffer) > min_buffer_size and episode % 20 == 1 :
             # print(f"Training at episode {episode + 1}...")
-            for i in range(40):
+            for i in range(20):
                 minibatch = random.sample(replay_buffer, batch_size)
                 loss = simple_replay_train(mainDQN, targetDQN, minibatch)
-                print(f"Batch {i+1}/40 - Loss: {loss:.8f}")
+                print(f"Batch {i+1}/20 - Loss: {loss:.8f}")
                 
                 if episode > 2000: 
                     loss_list.append(loss)

@@ -20,31 +20,31 @@ register(
     reward_threshold=10000.0,
 )
 
-device = 'cpu'
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(f"\nUsing {device} device")
 print("GPU: ", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "None")
 
 # 환경 및 하이퍼파라미터 설정
 env = gym.make('CartPole-v2')
-state_dim = env.observation_space.shape[0]  # 예: 4
+state_dim = env.observation_space.shape[0]   # 예: 4
 num_actions = env.action_space.n             # 예: 2
 
-discount = 0.99
-REPLAY_MEMORY = 30000
-batch_size = 64
+discount = 0.999
+REPLAY_MEMORY = 50000
+batch_size = 32
 alpha = 0.1
-tau = 0.8
-min_buffer_size = 2000
+tau = 0.5
+min_buffer_size = 10000
 epsilon_decay = 0.999
 final_epsilon = 0.001
-max_episodes = 5000
+max_episodes = 3000
 
 # Transformer 네트워크 관련 하이퍼파라미터
-num_layers = 4
-learning_rate = 0.0005
-seq_length = 100
-d_model = 64
-nhead = 8
+num_layers = 2
+learning_rate = 1e-3
+seq_length = 50
+d_model = 128
+nhead = 16
 dropout = 0.1
 
 # Positional Encoding 모듈
@@ -170,14 +170,14 @@ def main():
 
         while not done:
             current_state_seq = np.array(state_seq)
-            if np.random.rand() < epsilon:
+            if np.random.rand() < epsilon :
                 action = env.action_space.sample()
             else:
                 action = np.argmax(policy_net.predict(current_state_seq))
 
             next_state, reward, done, _ = env.step(action)
             if done:
-                reward = 0.1
+                reward = -10
 
             next_state_seq = state_seq.copy()
             next_state_seq.append(next_state)
@@ -193,16 +193,18 @@ def main():
         print(f"Episode: {episode + 1} steps: {step_count}")
 
         if len(replay_buffer) > min_buffer_size and episode % 10 == 1:
-            for _ in range(10):
+            for i in range(10):
                 minibatch = random.sample(replay_buffer, batch_size)
                 loss = replay_train(policy_net, target_net, minibatch)
+                print(f"Batch {i+1}/10 - Loss: {loss:.6f}")
+                
             soft_update_target(policy_net, target_net, tau)
 
-    plt.figure(figsize=(10, 5))
+    plt.figure(figsize=(10, 5), dpi=150)
     plt.plot(steps_list, label='Steps per Episode')
     plt.xlabel('Episode')
     plt.ylabel('Steps')
-    plt.title('Steps per Episode Over Training')
+    plt.title('Steps per Episode Over Training(Transformer)')
     plt.legend()
     plt.savefig("Steps_plotted_Transformer.png")
 
