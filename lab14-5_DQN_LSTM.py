@@ -29,11 +29,11 @@ env = gym.make('CartPole-v2')
 input_size = env.observation_space.shape[0]  # 상태 차원 (4)
 num_classes = env.action_space.n             # 행동 개수 (2)
 dis = 0.99                                   # 할인율
-REPLAY_MEMORY = 30000
+REPLAY_MEMORY = 80000
 batch_size = 64                              # 미니배치 크기
 alpha = 0.1                                  # Q-learning 업데이트 가중치
-tau = 0.8                                    # Target 네트워크 Soft Update 비율
-min_buffer_size = 2000                       # 최소 Replay Buffer 크기
+tau = 1                                      # Target 네트워크 Soft Update 비율
+min_buffer_size = 8000                       # 최소 Replay Buffer 크기
 epsilon_decay = 0.999                        # Epsilon 지수 감소율
 final_epsilon = 0.001                        # 학습 후반부에는 거의 greedy 정책 사용
 
