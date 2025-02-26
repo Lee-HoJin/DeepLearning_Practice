@@ -5,9 +5,20 @@ import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
 
+import json
+
 import visdom
 vis = visdom.Visdom()
 vis.close(env="main")
+
+history = {
+    "epoch": [],
+    "train_acc": [],
+    "val_acc": [],
+    "train_loss": [],
+    "val_loss": [],
+    "epoch_time": [] 
+}
 
 def value_tracker(value_plot, value, num):
     '''num, loss_value, are Tensor'''
@@ -201,6 +212,7 @@ for epoch in range(epochs):  # 여러 epoch 동안 학습
     lr_sche.step()
     # Accuracy 체크
     acc = acc_check(resnet50, testloader, epoch, save=0)
+    history["train_acc"].append(acc)
     value_tracker(acc_plt, torch.Tensor([acc]), torch.Tensor([epoch]))
     
 print('Finished Training')
@@ -219,3 +231,6 @@ with torch.no_grad():
         correct += (predicted == labels).sum().item()
 
 print('Final Accuracy: %d %%' % (100 * correct / total))
+
+with open("ResNet50.json", "w") as f:
+    json.dump(history, f)

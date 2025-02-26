@@ -2,12 +2,23 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+import json
+
 import torchvision
 import torchvision.transforms as transforms
 
 import visdom
 vis = visdom.Visdom()
 vis.close(env="main")
+
+history = {
+    "epoch": [],
+    "train_acc": [],
+    "val_acc": [],
+    "train_loss": [],
+    "val_loss": [],
+    "epoch_time": [] 
+}
 
 def value_tracker(value_plot, value, num):
     '''num, loss_value, are Tensor'''
@@ -203,3 +214,6 @@ with torch.no_grad():
         correct += (predicted == labels).sum().item()
 
 print('Final Accuracy: %d %%' % (100 * correct / total))
+
+with open("ResNet50.json", "w") as f:
+    json.dump(history, f)
