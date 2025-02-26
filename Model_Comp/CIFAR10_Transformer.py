@@ -173,9 +173,14 @@ def acc_check(net, test_set, epoch, save=1):
     return acc
 
 print("Train Loader Length: ", len(trainloader))
-epochs = 50
+epochs = 30
 
-for epoch in range(epochs):  # 여러 epoch 동안 학습
+for epoch in range(epochs):  # 여러 epoch 동안 학습    
+    start_event = torch.cuda.Event(enable_timing=True)
+    end_event = torch.cuda.Event(enable_timing=True)
+
+    start_event.record()  # GPU 시간 측정 시작
+    
     running_loss = 0.0
     for i, data in enumerate(trainloader, 0):
         inputs, labels = data
@@ -192,11 +197,22 @@ for epoch in range(epochs):  # 여러 epoch 동안 학습
             value_tracker(loss_plt, torch.Tensor([running_loss / 30]),
                           torch.Tensor([i + epoch * len(trainloader)]))
             print('[%d, %5d] loss: %.3f' % (epoch + 1, i + 1, running_loss / 30))
+            history["train_loss"].append(running_loss)
             running_loss = 0.0
     lr_sche.step()
+    
+    history["epoch"].append(epoch)
+    
     # Accuracy 체크
     acc = acc_check(vit_model, testloader, epoch, save=0)
-    value_tracker(acc_plt, torch.Tensor([acc]), torch.Tensor([epoch]))
+    history["train_acc"].append(acc)
+    value_tracker(acc_plt, torch.Tensor([acc]), torch.Tensor([epoch]))    
+        
+    end_event.record()  # GPU 시간 측정 종료
+    torch.cuda.synchronize()  # GPU 연산 동기화 (정확한 시간 측정)
+
+    epoch_duration = start_event.elapsed_time(end_event)
+    history["epoch_time"].append(epoch_duration)
     
 print('Finished Training')
 
