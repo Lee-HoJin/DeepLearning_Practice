@@ -144,10 +144,10 @@ class VisionTransformer(nn.Module):
         return x
 
 vit_model = VisionTransformer(image_size=32, patch_size=4, in_channels=3, num_classes=10,
-                              embed_dim=128, depth=6, num_heads=8, mlp_ratio=4, dropout_rate=0.1).to(device)
+                              embed_dim=128, depth=8, num_heads=16, mlp_ratio=4, dropout_rate=0.1).to(device)
 
 criterion = nn.CrossEntropyLoss().to(device)
-optimizer = optim.SGD(vit_model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
+optimizer = optim.SGD(vit_model.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
 lr_sche = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
 
 loss_plt = vis.line(Y=torch.Tensor(1).zero_(), opts=dict(title='loss_tracker', legend=['loss'], showlegend=True))
