@@ -8,7 +8,7 @@ import torchvision
 import torchvision.transforms as transforms
 
 import visdom
-vis = visdom.Visdom()
+vis = visdom.Visdom(port=8097)
 vis.close(env="main")
 
 history = {
@@ -67,13 +67,13 @@ transform_test = transforms.Compose([
 
 trainset = torchvision.datasets.CIFAR10(root='./cifar10', train=True,
                                         download=True, transform=transform_train)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=256,
+trainloader = torch.utils.data.DataLoader(trainset, batch_size=128,
                                           shuffle=True, num_workers=0)
 
 testset = torchvision.datasets.CIFAR10(root='./cifar10', train=False,
                                        download=True, transform=transform_test)
 
-testloader = torch.utils.data.DataLoader(testset, batch_size=256,
+testloader = torch.utils.data.DataLoader(testset, batch_size=128,
                                          shuffle=False, num_workers=0)
 
 classes = ('plane', 'car', 'bird', 'cat',
@@ -144,10 +144,10 @@ class VisionTransformer(nn.Module):
         return x
 
 vit_model = VisionTransformer(image_size=32, patch_size=4, in_channels=3, num_classes=10,
-                              embed_dim=128, depth=8, num_heads=32, mlp_ratio=4, dropout_rate=0.1).to(device)
+                              embed_dim=348, depth=12, num_heads=12, mlp_ratio=4, dropout_rate=0.1).to(device)
 
 criterion = nn.CrossEntropyLoss().to(device)
-optimizer = optim.SGD(vit_model.parameters(), lr=0.01, momentum=0.9, weight_decay=5e-4)
+optimizer = optim.SGD(vit_model.parameters(), lr=1e-2, momentum=0.9, weight_decay=5e-5)
 lr_sche = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
 
 loss_plt = vis.line(Y=torch.Tensor(1).zero_(), opts=dict(title='loss_tracker', legend=['loss'], showlegend=True))
