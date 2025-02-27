@@ -4,6 +4,7 @@ import torch.optim as optim
 
 import torchvision
 import torchvision.transforms as transforms
+import torchvision.models.vgg as vgg
 
 import json
 
@@ -79,91 +80,51 @@ testloader = torch.utils.data.DataLoader(testset, batch_size=128,
 classes = ('plane', 'car', 'bird', 'cat',
            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
-import resnet
 
-conv1x1=resnet.conv1x1
-Bottleneck = resnet.Bottleneck
-BasicBlock= resnet.BasicBlock
+cfg = [32,32,'M', 64,64,128,128,128,'M',256,256,256,512,512,512,'M'] #13 + 3 =vgg16
 
-class ResNet(nn.Module):
+class VGG(nn.Module):
 
-    def __init__(self, block, layers, num_classes=1000, zero_init_residual=False):
-        super(ResNet, self).__init__()
-        self.inplanes = 64
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=1, padding=1,
-                               bias=False)
-        self.bn1 = nn.BatchNorm2d(64)
-        self.relu = nn.ReLU(inplace=True)
-        # self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        
-        self.layer1 = self._make_layer(block, 64, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
-        
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
+    def __init__(self, features, num_classes=1000, init_weights=True):
+        super(VGG, self).__init__()
+        self.features = features
+        #self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
+        self.classifier = nn.Sequential(
+            nn.Linear(512 * 4 * 4, 4096),
+            nn.ReLU(True),
+            nn.Dropout(),
+            nn.Linear(4096, 4096),
+            nn.ReLU(True),
+            nn.Dropout(),
+            nn.Linear(4096, num_classes),
+        )
+        if init_weights:
+            self._initialize_weights()
 
+    def forward(self, x):
+        x = self.features(x)
+        #x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
+        x = self.classifier(x)
+        return x
+
+    def _initialize_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                nn.init.constant_(m.bias, 0)
 
-        # Zero-initialize the last BN in each residual branch,
-        # so that the residual branch starts with zeros, and each residual block behaves like an identity.
-        # This improves the model by 0.2~0.3% according to https://arxiv.org/abs/1706.02677
-        if zero_init_residual:
-            for m in self.modules():
-                if isinstance(m, Bottleneck):
-                    nn.init.constant_(m.bn3.weight, 0)
-                elif isinstance(m, BasicBlock):
-                    nn.init.constant_(m.bn2.weight, 0)
-
-    def _make_layer(self, block, planes, blocks, stride=1):
-        downsample = None
-        if stride != 1 or self.inplanes != planes * block.expansion:
-            downsample = nn.Sequential(
-                conv1x1(self.inplanes, planes * block.expansion, stride),
-                nn.BatchNorm2d(planes * block.expansion),
-            )
-
-        layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample))
-        self.inplanes = planes * block.expansion
-        for _ in range(1, blocks):
-            layers.append(block(self.inplanes, planes))
-
-        return nn.Sequential(*layers)
-
-    def forward(self, x):
-        x = self.conv1(x)
-        #x.shape =[1, 16, 32,32]
-        x = self.bn1(x)
-        x = self.relu(x)
-        # x = self.maxpool(x)
-
-        x = self.layer1(x)
-        #x.shape =[1, 128, 32,32]
-        x = self.layer2(x)
-        #x.shape =[1, 256, 32,32]
-        x = self.layer3(x)
-        #x.shape =[1, 512, 16,16]
-        x = self.layer4(x)
-        #x.shape =[1, 1024, 8,8]
-        
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-
-        return x
-    
-resnet50 = ResNet(resnet.Bottleneck, [3, 4, 6, 3], 10, True).to(device) 
-
+vgg16= VGG(vgg.make_layers(cfg),10,True).to(device)
 
 criterion = nn.CrossEntropyLoss().to(device)
-optimizer = optim.SGD(resnet50.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
+optimizer = optim.SGD(vgg16.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
 lr_sche = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
 
 loss_plt = vis.line(Y=torch.Tensor(1).zero_(), opts=dict(title='loss_tracker', legend=['loss'], showlegend=True))
@@ -203,7 +164,7 @@ for epoch in range(epochs):  # 여러 epoch 동안 학습
         inputs = inputs.to(device)
         labels = labels.to(device)
         optimizer.zero_grad()
-        outputs = resnet50(inputs)
+        outputs = vgg16(inputs)
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
@@ -220,7 +181,7 @@ for epoch in range(epochs):  # 여러 epoch 동안 학습
     history["epoch"].append(epoch)
     
     # Accuracy 체크
-    acc = acc_check(resnet50, testloader, epoch, save=0)
+    acc = acc_check(vgg16, testloader, epoch, save=0)
     history["train_acc"].append(acc)
     value_tracker(acc_plt, torch.Tensor([acc]), torch.Tensor([epoch]))
     
@@ -240,12 +201,12 @@ with torch.no_grad():
         images, labels = data
         images = images.to(device)
         labels = labels.to(device)
-        outputs = resnet50(images)
+        outputs = vgg16(images)
         _, predicted = torch.max(outputs.data, 1)
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
 
 print('Final Accuracy: %d %%' % (100 * correct / total))
 
-with open("ResNet50_CIFAR10.json", "w") as f:
+with open("VGG16_CIFAR10.json", "w") as f:
     json.dump(history, f)
