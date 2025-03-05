@@ -1,3 +1,4 @@
+from sys import stdin
 import pandas as pd
 import torch
 import torch.nn.functional as F
@@ -27,7 +28,7 @@ title_to_index = dict(zip(data['title'], data.index))
 ## overview가 가장 유사한 10개의 영화를 찾아내는 함수
 def get_recommendations(title) : 
 
-    print("선택한 영화 제목: \n", title)
+    print("_선택한 영화 제목: \n", title)
 
     if title not in title_to_index :
         return "리스트에 없는 영화 제목입니다."
@@ -48,5 +49,12 @@ def get_recommendations(title) :
     # 제목을 출력
     return data['title'].iloc[top_indices]
 
-print(get_recommendations('The Dark Knight Rises'))
+# print(get_recommendations('The Dark Knight Rises'))
 # print(get_recommendations('God Father'))
+
+while True :
+    print("\n영화 제목을 입력해주세요: ")
+    input = stdin.readline().rstrip()
+    if input == '0' :
+        break
+    print(get_recommendations(input))
