@@ -48,4 +48,5 @@ def get_recommendations(title, cosine_sim = cosine_sim) :
     # 제목을 출력
     return data['title'].iloc[movie_indices]
 
-print(get_recommendations('The Dark Knight Rises'))
+# print(get_recommendations('The Dark Knight Rises'))
+print(get_recommendations('God Father'))
