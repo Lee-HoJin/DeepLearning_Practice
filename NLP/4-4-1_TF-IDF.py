@@ -14,7 +14,7 @@ vocab.sort()
 N = len(docs) 
 
 def tf(t, d):
-  return d.count(t)
+  return d.count(t) # 문자열 t가 문자열 d에서 등장한 횟수
 
 def idf(t):
   df = 0
