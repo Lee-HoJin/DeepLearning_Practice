@@ -12,7 +12,7 @@ newsdata_test = fetch_20newsgroups(subset = 'test', shuffle = True)
 print('총 주제의 개수 : {}'.format(len(newsdata.target_names)))
 print(newsdata.target_names)
 
-df = pd.DataFrame(newsdata.data, columns = ['emial'])
+df = pd.DataFrame(newsdata.data, columns = ['email'])
 df['target'] = pd.Series(newsdata.target)
 
 train_email = df['email']
