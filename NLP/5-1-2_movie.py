@@ -10,8 +10,8 @@ data = pd.read_csv('movies_metadata.csv', low_memory=False)
 ## 🟢 'release_date' 열을 datetime 형식으로 변환
 data['release_date'] = pd.to_datetime(data['release_date'], errors='coerce')  # 오류 발생 시 NaT로 처리
 
-## 🟢 1970년 이후 영화만 남기기
-data = data[data['release_date'] >= '1970-01-01'].copy()
+# ## 🟢 1970년 이후 영화만 남기기
+# data = data[data['release_date'] >= '1970-01-01'].copy()
 
 
 ## preprocessing
