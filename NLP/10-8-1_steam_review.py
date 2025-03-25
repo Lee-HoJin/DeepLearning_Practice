@@ -92,7 +92,26 @@ model.add(Bidirectional(LSTM(hidden_units))) # Bidirectional LSTM을 사용
 model.add(Dense(1, activation='sigmoid'))
 
 es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=4)
-mc = ModelCheckpoint('best_model.h5', monitor='val_acc', mode='max', verbose=1, save_best_only=True)
+mc = ModelCheckpoint('10-8-1_best_model.h5', monitor='val_acc', mode='max', verbose=1, save_best_only=True)
 
 model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['acc'])
 history = model.fit(X_train, y_train, epochs=15, callbacks=[es, mc], batch_size=256, validation_split=0.2)
+
+loaded_model = load_model('10-8-1_best_model.h5')
+print("테스트 정확도: %.4f" % (loaded_model.evaluate(X_test, y_test)[1]))
+
+
+def sentiment_predict(new_sentence):
+  new_sentence = re.sub(r'[^ㄱ-ㅎㅏ-ㅣ가-힣 ]','', new_sentence)
+  new_sentence = mecab.morphs(new_sentence) # 토큰화
+  new_sentence = [word for word in new_sentence if not word in stopwords] # 불용어 제거
+  encoded = tokenizer.texts_to_sequences([new_sentence]) # 정수 인코딩
+  pad_new = pad_sequences(encoded, maxlen = max_len) # 패딩
+  score = float(loaded_model.predict(pad_new)) # 예측
+  if(score > 0.5):
+    print("{:.2f}% 확률로 긍정 리뷰입니다.".format(score * 100))
+  else:
+    print("{:.2f}% 확률로 부정 리뷰입니다.".format((1 - score) * 100))
+
+sentiment_predict('노잼 ..완전 재미 없음 ㅉㅉ')
+sentiment_predict('조금 어렵지만 재밌음ㅋㅋ')
