@@ -9,6 +9,9 @@ from tqdm import tqdm
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
+
+import pickle
+
 train_data = pd.read_table('ratings_train.txt')
 test_data = pd.read_table('ratings_test.txt')
 
@@ -50,6 +53,10 @@ for sentence in tqdm(test_data['document']):
 tokenizer = Tokenizer()
 tokenizer.fit_on_texts(X_train)
 
+# 토크나이저 저장
+with open('tokenizer.pickle', 'wb') as handle:
+    pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
 threshold = 3
 total_cnt = len(tokenizer.word_index) # 단어의 수
 rare_cnt = 0 # 등장 빈도수가 threshold보다 작은 단어의 개수를 카운트
@@ -85,13 +92,13 @@ y_test = np.array(test_data['label'])
 
 drop_train = [index for index, sentence in enumerate(X_train) if len(sentence) < 1]
 
-# 빈 샘플들을 제거
-X_train = np.delete(X_train, drop_train, axis=0)
-y_train = np.delete(y_train, drop_train, axis=0)
-
 max_len = 30
 X_train = pad_sequences(X_train, maxlen=max_len)
 X_test = pad_sequences(X_test, maxlen=max_len)
+
+# 빈 샘플들을 제거
+X_train = np.delete(X_train, drop_train, axis=0)
+y_train = np.delete(y_train, drop_train, axis=0)
 
 from tensorflow.keras.layers import Embedding, Dense, LSTM
 from tensorflow.keras.models import Sequential
@@ -107,10 +114,10 @@ model.add(LSTM(hidden_units))
 model.add(Dense(1, activation='sigmoid'))
 
 es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=4)
-mc = ModelCheckpoint('10-5-1_best_model.h5', monitor='val_acc', mode='max', verbose=1, save_best_only=True)
+mc = ModelCheckpoint('10-6-1_best_model.h5', monitor='val_acc', mode='max', verbose=1, save_best_only=True)
 
 model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['acc'])
 history = model.fit(X_train, y_train, epochs=15, callbacks=[es, mc], batch_size=64, validation_split=0.2)
 
-loaded_model = load_model('10-5-1_best_model.h5')
+loaded_model = load_model('10-6-1_best_model.h5')
 print("\n 테스트 정확도: %.6f" % (loaded_model.evaluate(X_test, y_test)[1]))
