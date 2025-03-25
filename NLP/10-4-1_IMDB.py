@@ -42,19 +42,5 @@ mc = ModelCheckpoint('GRU_model.h5', monitor='val_acc', mode='max', verbose=1, s
 model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['acc'])
 history = model.fit(X_train, y_train, epochs=15, callbacks=[es, mc], batch_size=64, validation_split=0.2)
 
-embedding_dim = 100
-hidden_units = 128
-
-model = Sequential()
-model.add(Embedding(vocab_size, embedding_dim))
-model.add(GRU(hidden_units))
-model.add(Dense(1, activation='sigmoid'))
-
-es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=4)
-mc = ModelCheckpoint('GRU_model.h5', monitor='val_acc', mode='max', verbose=1, save_best_only=True)
-
-model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['acc'])
-history = model.fit(X_train, y_train, epochs=15, callbacks=[es, mc], batch_size=64, validation_split=0.2)
-
 loaded_model = load_model('GRU_model.h5')
 print("\n 테스트 정확도: %.4f" % (loaded_model.evaluate(X_test, y_test)[1]))
