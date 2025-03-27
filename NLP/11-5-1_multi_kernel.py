@@ -13,6 +13,12 @@ from tensorflow.keras.layers import Embedding, Dropout, Conv1D, GlobalMaxPooling
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.models import load_model
 
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 import pickle
 
@@ -54,12 +60,15 @@ for sentence in tqdm(test_data['document']):
     stopwords_removed_sentence = [word for word in tokenized_sentence if not word in stopwords] # 불용어 제거
     X_test.append(stopwords_removed_sentence)
 
-tokenizer = Tokenizer()
-tokenizer.fit_on_texts(X_train)
+# tokenizer = Tokenizer()
+# tokenizer.fit_on_texts(X_train)
 
-# 토크나이저 저장
-with open('tokenizer.pickle', 'wb') as handle:
-    pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
+# # 토크나이저 저장
+# with open('tokenizer.pickle', 'wb') as handle:
+#     pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+with open('tokenizer.pickle', 'rb') as handle:
+    tokenizer = pickle.load(handle)
 
 threshold = 3
 total_cnt = len(tokenizer.word_index) # 단어의 수
@@ -133,11 +142,11 @@ model = Model(model_input, model_output)
 model.compile(loss="binary_crossentropy", optimizer="adam", metrics=["acc"])
 
 es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=4)
-mc = ModelCheckpoint('CNN_model.h5', monitor='val_acc', mode='max', verbose=1, save_best_only=True)
-
-model.fit(X_train, y_train, batch_size=64, epochs=10, validation_split=0.2, verbose=2, callbacks=[es, mc])
+mc = ModelCheckpoint('11-5-1_CNN_model.h5', monitor='val_acc', mode='max', verbose=1, save_best_only=True)
 
 print(model.summary())
 
-loaded_model = load_model('CNN_model.h5')
+model.fit(X_train, y_train, batch_size=64, epochs=10, validation_split=0.2, verbose=2, callbacks=[es, mc])
+
+loaded_model = load_model('11-5-1_CNN_model.h5')
 print("\n 테스트 정확도: %.4f" % (loaded_model.evaluate(X_test, y_test)[1]))
