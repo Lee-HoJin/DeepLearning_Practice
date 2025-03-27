@@ -81,3 +81,66 @@ print('훈련 데이터 레이블의 크기(shape):', y_train.shape)
 print('검증 데이터 레이블의 크기(shape):', y_val.shape)
 print('테스트 데이터의 개수 :', len(X_test))
 print('테스트 데이터 레이블의 개수 :', len(y_test))
+
+embedding_dict = dict()
+f = open(os.path.join('glove.6B.100d.txt'), encoding='utf-8')
+for line in f:
+    word_vector = line.split()
+    word = word_vector[0]
+    word_vector_arr = np.asarray(word_vector[1:], dtype='float32') # 100개의 값을 가지는 array로 변환
+    embedding_dict[word] = word_vector_arr
+f.close()
+
+print(embedding_dict['respectable'])
+print("임베딩 벡터의 차원 : ", len(embedding_dict['respectable']))
+
+embedding_dim = len(embedding_dict['respectable'])
+embedding_matrix = np.zeros((vocab_size, embedding_dim))
+
+for word, i in word_index.items():
+    embedding_vector = embedding_dict.get(word)
+    if embedding_vector is not None:
+        embedding_matrix[i] = embedding_vector
+
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Embedding, Dropout, Conv1D, GlobalMaxPooling1D, Dense, Input, Flatten, Concatenate
+
+kernel_sizes = [2, 3, 5]
+num_filters = 512
+dropout_ratio = 0.5
+
+model_input = Input(shape=(max_len,))
+output = Embedding(vocab_size, embedding_dim, weights=[embedding_matrix],
+                      input_length=max_len, trainable=False)(model_input)
+
+conv_blocks = []
+
+for size in kernel_sizes:
+    conv = Conv1D(filters=num_filters,
+                         kernel_size=size,
+                         padding="valid",
+                         activation="relu",
+                         strides=1)(output)
+    conv = GlobalMaxPooling1D()(conv)
+    conv_blocks.append(conv)
+
+output = Concatenate()(conv_blocks) if len(conv_blocks) > 1 else conv_blocks[0]
+output = Dropout(dropout_ratio)(output)
+model_output = Dense(len(label_idx), activation='softmax')(output)
+model = Model(model_input, model_output)
+
+model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['acc'])
+print(model.summary())
+
+history = model.fit(X_train, y_train,
+          batch_size=64,
+          epochs=10,
+          validation_data=(X_val, y_val))
+
+X_test = tokenizer.texts_to_sequences(X_test)
+X_test = pad_sequences(X_test, maxlen=max_len)
+
+y_predicted = model.predict(X_test)
+y_predicted = y_predicted.argmax(axis=-1) # 예측을 정수 시퀀스로 변환
+
+print('정확도(Accuracy) : ', sum(y_predicted == y_test) / len(y_test))
