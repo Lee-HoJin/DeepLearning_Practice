@@ -124,7 +124,7 @@ trigger_times = 0
 # 학습
 train_losses = []
 val_losses = []
-for epoch in range(10):
+for epoch in range(20):
     model.train()
     train_loss = 0
     correct = 0
@@ -134,6 +134,7 @@ for epoch in range(10):
         inputs, labels = inputs.to(device), labels.to(device)
         optimizer.zero_grad()
         outputs = model(inputs).view(-1)
+        
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
@@ -146,33 +147,37 @@ for epoch in range(10):
     train_losses.append(epoch_loss / len(train_loader))
     print(f"학습 정확도 epoch {epoch + 1}: {(correct / total)}")
     
-    # model.eval()
-    # val_loss = 0
-    # correct_val = 0
-    # total_val = 0
-    # with torch.no_grad():
-    #     for inputs, labels in val_loader:
-    #         inputs, labels = inputs.to(device), labels.to(device)
-    #         outputs = model(inputs)
-    #         loss = criterion(outputs, labels)
-    #         val_loss += loss.item() * inputs.size(0)
-    #         predicted = (outputs >= 0.5).float()
-    #         total_val += labels.size(0)
-    #         correct_val += (predicted == labels).sum().item()
-    # val_acc = correct_val / total_val
-    # val_loss = val_loss / total_val
-    # val_losses.append(val_loss / len(val_loader))
+    model.eval()
+    val_loss = 0
+    correct_val = 0
+    total_val = 0
+    with torch.no_grad():
+        for inputs, labels in val_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs).view(-1)
+            
+            loss = criterion(outputs, labels)
+            val_loss += loss.item()
+            predicted = (outputs >= 0.5).float()
+            total_val += labels.size(0)
+            correct_val += (predicted == labels).sum().item()
+    val_acc = correct_val / total_val
+    val_loss = val_loss / total_val
+    val_losses.append(val_loss / len(val_loader))
+    print(f"검증 정확도: {val_acc}")
+    print(f"검증 손실: {val_loss}")
+    print("")
     
-    # if val_acc > best_val_acc:
-    #     best_val_acc = val_acc
-    #     trigger_times = 0
-    #     torch.save(model.state_dict(), "11-4-2_best_model.pt")
-    #     print("모델 저장!")
-    # else:
-    #     trigger_times += 1
-    #     if trigger_times >= patience:
-    #         print("Early Stopping!")
-    #         break
+    if val_acc > best_val_acc:
+        best_val_acc = val_acc
+        trigger_times = 0
+        torch.save(model.state_dict(), "11-4-2_best_model.pt")
+        print("모델 저장!")
+    else:
+        trigger_times += 1
+        if trigger_times >= patience:
+            print("Early Stopping!")
+            break
 
 # 테스트 정확도
 # model.load_state_dict(torch.load("11-4-2_best_model.pt"))
@@ -192,8 +197,10 @@ print("테스트 정확도: %.8f" % (correct / total))
 
 # 손실 시각화
 plt.plot(range(1, len(train_losses)+1), train_losses, label='Train Loss')
-plt.title('Training Loss over Epochs')
+plt.plot(range(1, len(val_losses)+1), val_losses, label='Val Loss')
+plt.title('Training, Validation Loss over Epochs')
 plt.xlabel('Epoch')
 plt.ylabel('Loss')
 plt.legend()
 plt.savefig('11-4-2_spam_classify_torch.png')
+plt.show()
