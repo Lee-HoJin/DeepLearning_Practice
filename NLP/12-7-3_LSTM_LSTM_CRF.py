@@ -11,9 +11,9 @@ from seqeval.metrics import f1_score, classification_report
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+# import os
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 # urllib.request.urlretrieve("https://raw.githubusercontent.com/ukairia777/tensorflow-nlp-tutorial/main/12.%20Sequence%20Labeling/dataset/ner_dataset.csv", filename="ner_dataset.csv")
 data = pd.read_csv("ner_dataset.csv", encoding="latin1")
