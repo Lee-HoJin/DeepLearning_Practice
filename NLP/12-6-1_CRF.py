@@ -8,6 +8,12 @@ from sklearn.model_selection import train_test_split
 from tensorflow.keras.utils import to_categorical
 from seqeval.metrics import f1_score, classification_report
 
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 # urllib.request.urlretrieve("https://raw.githubusercontent.com/ukairia777/tensorflow-nlp-tutorial/main/12.%20Sequence%20Labeling/dataset/ner_dataset.csv", filename="ner_dataset.csv")
 data = pd.read_csv("ner_dataset.csv", encoding="latin1")
@@ -143,7 +149,6 @@ def sequences_to_tag(sequences):
         result.append(word_sequence)
     return result
 
-
 def sequences_to_tag_for_crf(sequences): 
     result = []
     # 전체 시퀀스로부터 시퀀스를 하나씩 꺼낸다.
@@ -156,6 +161,7 @@ def sequences_to_tag_for_crf(sequences):
         result.append(word_sequence)
     return result
 
+y_predicted = model.predict(np.array(X_test))[0]
 pred_tags = sequences_to_tag_for_crf(y_predicted)
 test_tags = sequences_to_tag(y_test)
 
