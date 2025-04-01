@@ -11,9 +11,9 @@ from seqeval.metrics import f1_score, classification_report
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+# import os
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 # urllib.request.urlretrieve("https://raw.githubusercontent.com/ukairia777/tensorflow-nlp-tutorial/main/12.%20Sequence%20Labeling/dataset/ner_dataset.csv", filename="ner_dataset.csv")
 data = pd.read_csv("ner_dataset.csv", encoding="latin1")
@@ -22,6 +22,7 @@ print('Tag 열의 각각의 값의 개수 카운트')
 print('================================')
 print(data.groupby('Tag').size().reset_index(name='count'))
 
+# na를 앞의 문자로 채움
 data = data.fillna(method="ffill")
 
 data['Word'] = data['Word'].str.lower()
