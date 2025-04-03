@@ -94,6 +94,8 @@ decoder_target = to_categorical(decoder_target)
 from tensorflow.keras.layers import Input, LSTM, Embedding, Dense
 from tensorflow.keras.models import Model
 import numpy as np
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.models import load_model
 
 encoder_inputs = Input(shape=(None, src_vocab_size))
 encoder_lstm = LSTM(units=256, return_state=True)
@@ -115,12 +117,17 @@ decoder_outputs = decoder_softmax_layer(decoder_outputs)
 
 model = Model([encoder_inputs, decoder_inputs], decoder_outputs)
 model.compile(optimizer="rmsprop", loss="categorical_crossentropy")
+# mc = ModelCheckpoint('bilstm_cnn.h5', monitor='val_acc', mode='max', verbose=1, save_best_only=True)
 
-model.fit(x=[encoder_input, decoder_input],
-          y=decoder_target,
-          batch_size=64,
-          epochs=40,
-          validation_split=0.2)
+# model.fit(x=[encoder_input, decoder_input],
+#           y=decoder_target,
+#           batch_size=64,
+#           epochs=40,
+#           validation_split=0.2)
+
+# model = load_model('bilstm_cnn.h5')
+
+# print(model.summary())
 
 encoder_model = Model(inputs=encoder_inputs, outputs=encoder_states)
 
