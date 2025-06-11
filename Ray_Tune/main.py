@@ -19,6 +19,12 @@ train_loader = DataLoader(train_set, batch_size=128)
 x_test = torch.tensor(x_test).float()
 y_test = torch.tensor(y_test).float()
 
+input_size = 0
+
+for i, (x, y) in enumerate(train_loader):
+    input_size = len(x)
+    break
+
 def get_optimizer(model, lr):
   return torch.optim.SGD(model.parameters(), lr=lr)
 
@@ -30,7 +36,7 @@ class MyModel(nn.Module):
     super().__init__()
 
     self._model = nn.Sequential(
-        nn.Linear(x.size(-1), l2_in),
+        nn.Linear(input_size, l2_in),
         nn.ReLU(),
         nn.Linear(l2_in, l2_out),
         nn.ReLU(),
