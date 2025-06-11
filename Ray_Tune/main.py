@@ -86,7 +86,7 @@ run_config=air.RunConfig(
 )
 
 tuner = tune.Tuner(
-    train_regression,
+    trainable_regression,
     tune_config=tune_config,
     run_config=run_config,
     param_space=param_space,
