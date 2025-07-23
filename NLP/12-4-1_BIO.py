@@ -30,6 +30,13 @@ for tagged_sentence in tagged_sentences: # 14,041개의 문장 샘플을 1개씩
     sentences.append(list(sentence)) # 각 샘플에서 단어 정보만 저장한다.
     ner_tags.append(list(tag_info)) # 각 샘플에서 개체명 태깅 정보만 저장한다.
 
+print('첫번째 샘플의 문장 :',sentences[0])
+print('첫번째 샘플의 레이블 :',ner_tags[0])
+
+print(sentences[12])
+print(ner_tags[12])
+
+
 vocab_size = 4000
 src_tokenizer = Tokenizer(num_words=vocab_size, oov_token='OOV')
 src_tokenizer.fit_on_texts(sentences)
