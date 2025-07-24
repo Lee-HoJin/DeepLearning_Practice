@@ -1,6 +1,7 @@
 import datasets
 import numpy as np 
 import json
+import evaluate
 from transformers import DistilBertTokenizerFast, \
                          AutoModelForTokenClassification, \
                          TrainingArguments, \
@@ -58,19 +59,20 @@ def tokenize_and_align_labels(examples) :
 tokenized_datasets = conll2003.map(tokenize_and_align_labels, batched = True)
 
 model = AutoModelForTokenClassification.from_pretrained("distilbert-base-uncased", num_labels = 9)
+
 args = TrainingArguments(
     "test-ner",
-    evaluation_strategy = "epoch",
-    learning_rate = 2e-5,
-    per_device_training_batch_size = 16,
-    per_device_eval_batch_size = 16,
-    num_train_epochs = 3,
-    weight_decay = 0.01
+    eval_strategy="epoch",
+    learning_rate=2e-5,
+    per_device_train_batch_size=16,
+    per_device_eval_batch_size=16,
+    num_train_epochs=3,
+    weight_decay=0.01
 )
 
 data_collator =  DataCollatorForTokenClassification(tokenizer)
 
-metric = datasets.load_metric("seqeval")
+metric = evaluate.load("seqeval")
 
 example = conll2003['train'][0]
 label_list = conll2003["train"].features["ner_tags"].feature.names
@@ -100,11 +102,11 @@ def compute_metrics(p):
 trainer = Trainer( 
     model, 
     args, 
-   train_dataset=tokenized_datasets["train"], 
-   eval_dataset=tokenized_datasets["validation"], 
-   data_collator=data_collator, 
-   tokenizer=tokenizer, 
-   compute_metrics=compute_metrics 
+    train_dataset=tokenized_datasets["train"], 
+    eval_dataset=tokenized_datasets["validation"], 
+    data_collator=data_collator, 
+    tokenizer=tokenizer, 
+    compute_metrics=compute_metrics 
 ) 
 
 trainer.train() 
