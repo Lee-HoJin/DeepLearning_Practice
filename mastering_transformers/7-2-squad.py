@@ -1,5 +1,11 @@
 from datasets import load_dataset 
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, \
+                         AutoModelForQuestionAnswering, \
+                         TrainingArguments, \
+                         Trainer, \
+                         default_data_collator, \
+                         pipeline
+import evaluate
 
 squad = load_dataset("squad_v2") 
 print(squad)
@@ -71,3 +77,44 @@ def prepare_train_features(examples, pad_on_right=True):
                 tokenized_examples["end_positions"].append(token_end_index + 1) 
     return tokenized_examples 
 
+tokenized_datasets = squad.map(prepare_train_features, batched=True, remove_columns=squad["train"].column_names)
+
+model = AutoModelForQuestionAnswering.from_pretrained(model) 
+
+args = TrainingArguments( 
+    f"test-squad", 
+    eval_strategy = "epoch", 
+    learning_rate=2e-5, 
+    per_device_train_batch_size=16, 
+    per_device_eval_batch_size=16, 
+    num_train_epochs=3, 
+    weight_decay=0.01, 
+)
+
+data_collator = default_data_collator 
+
+trainer = Trainer( 
+    model, 
+    args, 
+    train_dataset=tokenized_datasets["train"], 
+    eval_dataset=tokenized_datasets["validation"], 
+    data_collator=data_collator, 
+    tokenizer=tokenizer, 
+) 
+
+trainer.train() 
+
+trainer.save_model("distillBERT_SQUAD")
+
+qa_model = pipeline('question-answering',
+                    model='distilbert-base-cased-distilled-squad',
+                    tokenizer='distilbert-base-cased') 
+
+question = squad["validation"][0]["question"] 
+context = squad["validation"][0]["context"] 
+print("Question:") 
+print(question) 
+print("Context:") 
+print(context) 
+
+print(qa_model(question=question, context=context))
