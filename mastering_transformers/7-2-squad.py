@@ -5,7 +5,6 @@ from transformers import AutoTokenizer, \
                          Trainer, \
                          default_data_collator, \
                          pipeline
-import evaluate
 
 squad = load_dataset("squad_v2") 
 print(squad)
