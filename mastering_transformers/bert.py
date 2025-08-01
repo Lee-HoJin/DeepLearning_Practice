@@ -7,7 +7,7 @@ import pandas as pd
 # with open("corpus.txt", "w") as f :
 #     f.writelines(reviews)
     
-from tokenizers import BertWordPieceTokenizer
+from tokenizers_examples import BertWordPieceTokenizer
 # bert_wordpiece_tokenizer = BertWordPieceTokenizer()
 # bert_wordpiece_tokenizer.train("corpus.txt")
 
